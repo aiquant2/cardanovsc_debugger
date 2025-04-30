@@ -1,19 +1,30 @@
 {
-  "name": "demo-extension",
-  "displayName": "demo_extension",
-  "description": "demo",
+  "name": "cardanovsc_debugger",
+  "displayName": "cardanovsc_debugger",
+  "description": "This is a debugger extension",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.96.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onDebugResolve:haskell"
+    
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "haskell",
+        "extensions": [
+          ".hs"
+        ],
+        "aliases": [
+          "Haskell"
+        ]
+      }
+    ],
     "breakpoints": [
       {
         "language": "haskell"
@@ -56,7 +67,7 @@
     ],
     "commands": [
       {
-        "command": "demo-extension.helloWorld",
+        "command": "cardanovscDebugger.helloWorld",
         "title": "Hello World"
       }
     ]
@@ -73,13 +84,12 @@
     "@types/lodash": "^4.17.16",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/vscode": "^1.99.0",
+    "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.16.0",
-    "typescript": "^5.7.2"
+    "eslint": "^9.16.0"
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
@@ -87,6 +97,7 @@
     "await-notify": "^1.0.1",
     "lodash": "^4.17.21",
     "rxjs": "^7.8.2",
+    "typescript": "^5.8.3",
     "vscode-debugadapter": "^1.51.0"
   }
 }

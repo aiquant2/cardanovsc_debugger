@@ -1,71 +1,127 @@
-# demo-extension README
+# ⚡ cardanovsc_debugger 🚀  
+[![Version](https://vsmarketplacebadges.dev/version/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)  
+[![Downloads](https://vsmarketplacebadges.dev/downloads/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)  
+[![Installs](https://vsmarketplacebadges.dev/installs/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)
 
-This is the README for your extension "demo-extension". After writing up a brief description, we recommend including the following sections.
+## ✨ Features
 
-## Features
+**cardanovsc_debugger** is a lightweight yet powerful Visual Studio Code extension tailored for debugging Haskell and Plutus smart contracts. Whether you're developing for the Cardano blockchain or experimenting with Plutus scripts, this extension provides:
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- 🔍 Seamless debugging support for `.hs` (Haskell) files.
+- 🧠 Launch configuration support for customized debugging.
+- `showIO`: Show standard I/O during debug.
+- 📂 Integrated with VS Code Debug Adapter Protocol.
+- 🚀 Real-time error checking and suggestion 
 
-For example if there is an image subfolder under your extension project workspace:
 
-\!\[feature X\]\(images/feature-x.png\)
+Perfect for developers working with Cardano’s Plutus smart contracts, CardanoVSC Debugger brings precision debugging right inside VS Code.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
 
-## Requirements
+## 🚀 Getting Started
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+To start debugging Haskell or Plutus smart contracts with cardanovsc_debugger, follow the instructions below to set up your development environment and extension.
 
-## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## 📥 Installation
 
-For example:
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/AIQUANT-Tech/CardanoVSC.git
+   cd CardanoVSC/cardanovsc/
+   ```
+2. Install dependencies:
+   ```sh
+   npm install
+   ```
+3. Debug the extension by clicking the VS Code debug icon.
 
-This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+OR, you can also do like this :
 
-## Known Issues
+1. Go to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger).
+2. Click **Install** or use the **Extensions** view in VS Code (`Ctrl+Shift+X`) and search for `cardanovsc_debugger`.
+3. Once installed, the extension will activate automatically when you open `.hs` files.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
 
-## Release Notes
 
-Users appreciate release notes as you update your extension.
+## 📂 FOLDER STRUCTURE
 
-### 1.0.0
+```
+└── 📁cardanovsc_debugger
+    └── 📁.vscode
+        └── extensions.json
+        └── launch.json
+        └── settings.json
+        └── tasks.json
+    └── 📁dist-newstyle
+        └── 📁cache
+            └── compiler
+    └── 📁src
+        └── cardanovscDebugAdapter.ts
+        └── diagnostics.ts
+        └── extension.ts
+        └── 📁test
+            └── extension.test.ts
+    └── .gitignore
+    └── .vscode-test.mjs
+    └── .vscodeignore
+    └── CHANGELOG.md
+    └── diagnostic.js
+    └── diagnostic.js.map
+    └── eslint.config.mjs
+    └── package-lock.json
+    └── package.json
+    └── README.md
+    └── tsconfig.json
+    └── vsc-extension-quickstart.md
 
-Initial release of ...
+```
+## 🛠️ Usage
 
-### 1.0.1
+1. Open a `.hs` (Haskell) file in your VS Code workspace.
+2. Press `ctrl+shift+D` or go to the **Run and Debug** sidebar and select **Run Extension**.
+3. It automatically Configures your `launch.json` with the required fields:
+```json OR you can also manually Configure like this:
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}"
+			],
+			"outFiles": [
+				"${workspaceFolder}/out/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		}
+	]
+}
 
-Fixed issue #.
+4.🚀 Automatic Debug Configuration 🚀 : When you open a Haskell file and start debugging, CardanoVSC Debugger intelligently creates a default debug configuration without requiring manual setup.
 
-### 1.1.0
+It checks if the file is a valid Haskell source.
 
-Added features X, Y, and Z.
+If valid, it auto-generates a configuration like the following:
 
----
+{
+  "type": "haskell",
+  "name": "Debug Haskell",
+  "request": "launch",
+  "program": "cabal repl --repl-no-load",
+  "activeFile": "<your-current-haskell-file>",
+  "showIO": true,
+  "cwd": "<your-workspace-folder>"
+}
 
-## Following extension guidelines
+This configuration is created dynamically using the active Haskell file in the editor.
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+If the file is not recognized as a valid Haskell file, a warning is displayed.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+Start DebuggingPress F5 or open the Command Palette (Ctrl + Shift + P) → select and start Debugging: Run Extension.
 
-## Working with Markdown
+Fix Errors Before DebuggingEnsure errors shown in the Problems panel are resolved for a smoother debugging experience. Suggestions will appear when you hover over the issues.
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
