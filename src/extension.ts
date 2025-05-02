@@ -1,6 +1,6 @@
 
 import * as vscode from 'vscode';
-import { HaskellDebugSession } from './cardanovscDebugAdapter';
+import { HaskellDebugSession } from './debugAdapter';
 import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
 import { log } from 'console';
 
