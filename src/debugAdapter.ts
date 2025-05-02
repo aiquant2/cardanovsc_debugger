@@ -24,9 +24,6 @@ import {
   }
    
   export class HaskellDebugSession extends DebugSession {
-      static initializeRequest(response: DebugProtocol.InitializeResponse, arg1: DebugProtocol.InitializeRequestArguments) {
-          throw new Error('Method not implemented.');
-      }
     private ghciProcess: child_process.ChildProcess | undefined;
     private isFileLoaded = false;
     private loadDebounceTimer: NodeJS.Timeout | undefined;
