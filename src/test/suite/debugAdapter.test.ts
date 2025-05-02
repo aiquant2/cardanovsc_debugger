@@ -80,7 +80,6 @@ suite('Haskell Debug Adapter Tests', () => {
     });
 });
 
-// Helper interface for DebugProtocol types
 interface DebugProtocol {
     interface InitializeResponse {
         body?: any;
