@@ -72,7 +72,7 @@ function startGhcidIfNeeded() {
     }
 }
 
-function stopGhcid() {
+export function stopGhcid() {
     if (ghcidProcess) {
         ghcidProcess.kill();
         ghcidProcess = undefined;
@@ -146,7 +146,7 @@ function processGhcidOutput(lines: string[]) {
     } | null = null;
 
     const flushCurrentError = () => {
-        if (!currentError) return;
+        if (!currentError) {return;}
 
         const filePath = path.resolve(vscode.workspace.rootPath || '', currentError.file);
         const fileUri = vscode.Uri.file(filePath);
@@ -246,7 +246,7 @@ function processGhcidOutput(lines: string[]) {
     updateErrorDecorations();
 }
 
-function updateErrorDecorations() {
+export function updateErrorDecorations() {
     const activeEditor = vscode.window.activeTextEditor;
     if (!activeEditor || activeEditor.document.languageId !== 'haskell') {
         return;

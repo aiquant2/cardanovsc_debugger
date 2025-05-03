@@ -6,7 +6,8 @@ import {
     TerminatedEvent,
   } from "vscode-debugadapter";
   import { DebugProtocol } from "vscode-debugprotocol";
-  import * as child_process from "child_process";
+ // eslint-disable-next-line @typescript-eslint/naming-convention
+import * as child_process from 'child_process';
   import * as vscode from "vscode";
   import * as fs from "fs/promises";
   import { diagnosticCollection, parseCabalErrors} from "./diagnostics";
@@ -24,6 +25,25 @@ import {
   }
    
   export class HaskellDebugSession extends DebugSession {
+      static sendErrorResponse: jest.Mock<any, any, any>;
+      static loadHaskellFile(filePath: string) {
+          throw new Error('Method not implemented.');
+      }
+      static lastLoadedFileContent: string;
+      static isFileLoaded: boolean;
+      static restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments) {
+          throw new Error('Method not implemented.');
+      }
+      static disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments) {
+          throw new Error('Method not implemented.');
+      }
+      static evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments) {
+          throw new Error('Method not implemented.');
+      }
+      static ghciProcess: any;
+      static initializeRequest(response: { body: {}; }, args: {}) {
+          throw new Error('Method not implemented.');
+      }
     private ghciProcess: child_process.ChildProcess | undefined;
     private isFileLoaded = false;
     private loadDebounceTimer: NodeJS.Timeout | undefined;
@@ -188,7 +208,7 @@ import {
     }
    
     private async loadHaskellFile(filePath: string): Promise<void> {
-      if (!this.ghciProcess) return;
+      if (!this.ghciProcess) {return;}
    
       if (this.loadDebounceTimer) {
         clearTimeout(this.loadDebounceTimer);

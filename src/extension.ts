@@ -4,9 +4,6 @@ import { HaskellDebugSession } from './debugAdapter';
 import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
 
 
-
-let hasRegistered = false;
-
 export function activate(context: vscode.ExtensionContext) {
     console.log('Haskell Debugger extension activated');
 
@@ -21,9 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposable);
     
     
-    
     try {
-        if (!hasRegistered) {
+        
         // Register configuration provider
         const configProvider = new HaskellConfigurationProvider();
         context.subscriptions.push(
@@ -38,23 +34,23 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.debug.registerDebugAdapterDescriptorFactory('haskell', debugAdapterFactory)
         );
 
-        hasRegistered = true;
+        
         console.log(debugAdapterFactory);
         console.log('Haskell debugger providers registered successfully');
     }
         
-    } catch (error) {
+    catch (error) {
         
         console.error('Failed to register debug providers:', error);
         vscode.window.showErrorMessage('Failed to initialize Haskell debugger');
     }
 }
 
-export function deactivate() {
+    export function deactivate() {
     console.log('Haskell Debugger extension deactivated');
 }
 
-class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+export class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     createDebugAdapterDescriptor(
         session: vscode.DebugSession
     ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
@@ -70,7 +66,7 @@ class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory 
     }
 }
 
-class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider {
+export class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider {
     resolveDebugConfiguration(
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
