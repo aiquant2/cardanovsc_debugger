@@ -2,14 +2,29 @@
 import * as vscode from 'vscode';
 import { HaskellDebugSession } from './debugAdapter';
 import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
+import { execFile } from 'child_process';
+import path from 'path';
+import os from 'os';
 
 
-
-let hasRegistered = false;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Haskell Debugger extension activated');
-
+    const platform = os.platform();
+    const scriptName = platform === 'win32' ? 'check-ghcid.bat' : 'check-ghcid.sh';
+    console.log(context.extensionPath);
+    
+    const scriptPath = path.join(context.extensionPath, 'scripts', scriptName);
+  
+    execFile(scriptPath, (error, stdout, stderr) => {
+      if (error) {
+        vscode.window.showWarningMessage(
+          '⚠️ "ghcid" is not installed. Diagnostics and live error checking will be unavailable. Please install it via `cabal install ghcid` or `stack install ghcid`.'
+        );
+        console.warn(`ghcid check script output: ${stderr || stdout}`);
+      } else {
+        console.log(`ghcid is installed: ${stdout.trim()}`);
+      }
+    });
     // Start Ghcid and Diagnostics when opening a Haskell file
     startGhcidOnHaskellOpen(context);
 
@@ -23,14 +38,12 @@ export function activate(context: vscode.ExtensionContext) {
     
     
     try {
-        if (!hasRegistered) {
         // Register configuration provider
         const configProvider = new HaskellConfigurationProvider();
         context.subscriptions.push(
             vscode.debug.registerDebugConfigurationProvider('haskell', configProvider)
         );
         
-        console.log(configProvider);
         
         // Register debug adapter descriptor factory
         const debugAdapterFactory = new InlineDebugAdapterFactory();
@@ -38,10 +51,9 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.debug.registerDebugAdapterDescriptorFactory('haskell', debugAdapterFactory)
         );
 
-        hasRegistered = true;
         console.log(debugAdapterFactory);
         console.log('Haskell debugger providers registered successfully');
-    }
+    
         
     } catch (error) {
         
@@ -64,7 +76,6 @@ class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory 
         try {
             return new vscode.DebugAdapterInlineImplementation(new HaskellDebugSession());
         } catch (error) {
-            console.error('Failed to create debug adapter:', error);
             throw error;
         }
     }
@@ -77,14 +88,21 @@ class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider 
         token?: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.DebugConfiguration> {
         try {
-            if (!config.type && !config.request && !config.name) {
+            if (
+                config.type !== 'haskell' ||
+                config.request !== 'launch' ||
+                config.program !== 'cabal repl --repl-no-load' ||
+                !config.name
+            ) {
                 return this.createDefaultConfig();
             }
+            
+           
+            
 
             return this.validateAndEnhanceConfig(config);
             
         } catch (error) {
-            console.error('Error resolving debug configuration:', error);
             return undefined;
         }
     }
@@ -99,7 +117,7 @@ class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider 
 
             return {
                 type: 'haskell',
-                name: 'Debug Haskell',
+                name: 'Debug Cabal Project',
                 request: 'launch',
                 program: 'cabal repl --repl-no-load',
                 activeFile: editor.document.fileName,
@@ -129,7 +147,6 @@ class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider 
         }
 
         config.program = config.program || 'cabal repl --repl-no-load';
-        config.stopOnEntry = config.stopOnEntry || false;
         config.showIO = config.showIO !== false;
         config.cwd = config.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 

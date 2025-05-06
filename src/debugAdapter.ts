@@ -6,7 +6,7 @@ import {
     TerminatedEvent,
   } from "vscode-debugadapter";
   import { DebugProtocol } from "vscode-debugprotocol";
-  import * as child_process from "child_process";
+  import * as childprocess from "child_process";
   import * as vscode from "vscode";
   import * as fs from "fs/promises";
   import { diagnosticCollection, parseCabalErrors} from "./diagnostics";
@@ -24,7 +24,7 @@ import {
   }
    
   export class HaskellDebugSession extends DebugSession {
-    private ghciProcess: child_process.ChildProcess | undefined;
+    private ghciProcess: childprocess.ChildProcess | undefined;
     private isFileLoaded = false;
     private loadDebounceTimer: NodeJS.Timeout | undefined;
     private lastLoadedFileContent: string | undefined;
@@ -98,7 +98,7 @@ import {
     
         this.sendEvent(new OutputEvent("Launching GHCi...\n", 'console'));
     
-        this.ghciProcess = child_process.spawn(cmd, cmdArgs, {
+        this.ghciProcess = childprocess.spawn(cmd, cmdArgs, {
           cwd: workspaceFolder,
           shell: true,
         });
@@ -188,7 +188,7 @@ import {
     }
    
     private async loadHaskellFile(filePath: string): Promise<void> {
-      if (!this.ghciProcess) return;
+      if (!this.ghciProcess) {return;}
    
       if (this.loadDebounceTimer) {
         clearTimeout(this.loadDebounceTimer);

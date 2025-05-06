@@ -146,7 +146,7 @@ function processGhcidOutput(lines: string[]) {
     } | null = null;
 
     const flushCurrentError = () => {
-        if (!currentError) return;
+        if (!currentError) {return;}
 
         const filePath = path.resolve(vscode.workspace.rootPath || '', currentError.file);
         const fileUri = vscode.Uri.file(filePath);

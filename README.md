@@ -27,7 +27,7 @@ To start debugging Haskell or Plutus smart contracts with cardanovsc_debugger, f
 1. Clone the repository:
    ```sh
    git clone https://github.com/AIQUANT-Tech/CardanoVSC.git
-   cd CardanoVSC/cardanovsc/
+   cd CardanoVSC/cardanovsc-debugger/
    ```
 2. Install dependencies:
    ```sh
@@ -35,15 +35,23 @@ To start debugging Haskell or Plutus smart contracts with cardanovsc_debugger, f
    ```
 3. Debug the extension by clicking the VS Code debug icon.
 
-
 OR, you can also do like this :
 
-1. Go to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger).
+1. Go to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/vscode).
 2. Click **Install** or use the **Extensions** view in VS Code (`Ctrl+Shift+X`) and search for `cardanovsc_debugger`.
 3. Once installed, the extension will activate automatically when you open `.hs` files.
 
 
 
+## 🏗️ Development
+
+### ✅ Running Tests
+
+
+To run tests:
+```sh
+npm run test
+```
 ## 📂 FOLDER STRUCTURE
 
 ```
@@ -62,6 +70,8 @@ OR, you can also do like this :
         └── extension.ts
         └── 📁test
             └── extension.test.ts
+            └── diagnostics.test.ts
+            └── cardanovscDebugAdapter.test.ts
     └── .gitignore
     └── .vscode-test.mjs
     └── .vscodeignore
@@ -77,51 +87,73 @@ OR, you can also do like this :
 
 ```
 ## 🛠️ Usage
+### Install 
+##### cabal
+```
+$ cabal update
+$ cabal install ghcid
+```
+
+
+### Run
+## 1. Create a project
+
+### Cabal project
+```
+$ mkdir project_name
+$ cd project_name
+$ cabal init
+```
 
 1. Open a `.hs` (Haskell) file in your VS Code workspace.
-2. Press `ctrl+shift+D` or go to the **Run and Debug** sidebar and select **Run Extension**.
-3. It automatically Configures your `launch.json` with the required fields:
-```json OR you can also manually Configure like this:
-{
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "Run Extension",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}"
-			],
-			"outFiles": [
-				"${workspaceFolder}/out/**/*.js"
-			],
-			"preLaunchTask": "${defaultBuildTask}"
-		}
-	]
-}
+2. Press `ctrl+shift+D` or go to the **Run and Debug** sidebar and select **debug cabal project**.
+3. 🚀 Automatic Debug Configuration 🚀 : When you open a Haskell file and start debugging, CardanoVSC Debugger intelligently creates a default debug configuration without requiring manual setup.
 
-4.🚀 Automatic Debug Configuration 🚀 : When you open a Haskell file and start debugging, CardanoVSC Debugger intelligently creates a default debug configuration without requiring manual setup.
+##### It checks if the file is a valid Haskell source.
 
-It checks if the file is a valid Haskell source.
-
-If valid, it auto-generates a configuration like the following:
-
+##### If valid, it auto-generates a configuration like the following:
+```
 {
   "type": "haskell",
-  "name": "Debug Haskell",
+  "name": "debug cabal project",
   "request": "launch",
   "program": "cabal repl --repl-no-load",
-  "activeFile": "<your-current-haskell-file>",
+  "activeFile": "${file}",
   "showIO": true,
-  "cwd": "<your-workspace-folder>"
+  "cwd": "${workspaceFolder}"
 }
+```
 
-This configuration is created dynamically using the active Haskell file in the editor.
+## 🧩 Manual Setup (Optional)
+##### If you prefer manual configuration, create or update .vscode/launch.json with the following json:
+```
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "haskell",
+      "request": "launch",
+      "name": "Debug Cabal Project",
+      "program": "cabal repl --repl-no-load",
+      "activeFile": "${file}",
+      "showIO": true,
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
+```
+You can customize name, cwd, or add more configs based on your needs.
 
-If the file is not recognized as a valid Haskell file, a warning is displayed.
 
-Start DebuggingPress F5 or open the Command Palette (Ctrl + Shift + P) → select and start Debugging: Run Extension.
+## 🤝 Contributing
+Contributions are welcome! Please open an issue or pull request on GitHub.
 
-Fix Errors Before DebuggingEnsure errors shown in the Problems panel are resolved for a smoother debugging experience. Suggestions will appear when you hover over the issues.
+## 📜 License
+This project is licensed under the MIT License.
+
+## 📌Scope and Design Documentation
+
+- **Scope and Design Document:** https://github.com/AIQUANT-Tech/CardanoVSC/blob/main/DesignDocs/CardanoVSC-Scope_Design_Document.pdf
+- **Figma Design:** https://www.figma.com/design/MiVmXAtePUc3UndaGl7eGK
 
 

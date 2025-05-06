@@ -1,18 +1,42 @@
 {
   "name": "cardanovsc-debugger",
   "displayName": "cardanovsc_debugger",
-  "description": "This is a debugger extension",
+  "description": "Plutus and Haskell  debugger extension",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
   },
-  "categories": [
-    "Other"
+  "icon": "media/cardanovscdebugger.png",
+  "keywords": [
+    "Plutus",
+    "debug",
+    "CardanoVSC",
+    "cardanovsc",
+    "cardano",
+    "blockchain",
+    "haskell",
+    "plutus",
+    "cardanovsc_debugger",
+    "ghci",
+    "cabal",
+    "debugger"
   ],
+  "publisher": "AIQUANT-TECHNOLOGIES",
+  "license": "MIT",
+  "categories": [
+    "Debuggers"
+  ],
+  "extensionDependencies": [
+		"AIQUANT-TECHNOLOGIES.cardanovsc"
+	],
   "activationEvents": [
     "onDebugResolve:haskell",
     "onLanguage:haskell"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AIQUANT-Tech/CardanoVSC"
+  },
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
@@ -31,7 +55,6 @@
         "language": "haskell"
       }
     ],
-    "supportsBreakpointLocationsRequest": true,
     "debuggers": [
       {
         "type": "haskell",
@@ -42,28 +65,69 @@
           "haskell"
         ],
         "configurationAttributes": {
-          "launch": {
-            "required": [
-              "program"
-            ],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "Path to the Haskell program to debug"
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "default": false,
-                "description": "Automatically stop after launch."
-              },
-              "showIO": {
-                "type": "boolean",
-                "default": true,
-                "description": "Display I/O output from the program"
-              }
-            }
+         "launch": {
+  "required": [
+    "program"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["haskell"]
+    },
+    "request": {
+      "type": "string",
+      "enum": ["launch"]
+    },
+    "program": {
+      "type": "string",
+      "description": "Path to the Haskell program to debug"
+    },
+    
+    "showIO": {
+      "type": "boolean",
+      "default": true,
+      "description": "Display I/O output from the program"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Working directory for the debuggee"
+    },
+    
+    "activeFile": {
+      "type": "string",
+      "description": "Path to the active file being debugged"
+    }
+  }
+}
+
+        },
+        "initialConfigurations": [
+          {
+            "type": "haskell",
+            "request": "launch",
+            "name": "Debug Cabal Project",
+            "program": "cabal repl --repl-no-load",
+            "activeFile": "${file}",
+            "showIO": true,
+            "cwd": "${workspaceFolder}"
           }
-        }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "cardanovsc_debugger: Launch",
+            "description": "Debug a Haskell program",
+            "body": {
+              "type": "haskell",
+              "request": "launch",
+              "name": "Debug Cabal Project",
+              "program": "cabal repl --repl-no-load",
+              "activeFile": "${file}",
+              "showIO": true,
+              "cwd": "${workspaceFolder}"
+            }
+          }        
+
+        ]
       }
     ],
     "commands": [
@@ -73,6 +137,8 @@
       }
     ]
   },
+
+
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
@@ -82,12 +148,14 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/chai": "^5.2.1",
     "@types/lodash": "^4.17.16",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
+    "@vscode/debugadapter-testsupport": "^1.56.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.16.0"
@@ -96,9 +164,11 @@
     "@vscode/debugadapter": "^1.68.0",
     "@vscode/debugprotocol": "^1.68.0",
     "await-notify": "^1.0.1",
+    "chai": "^5.2.0",
     "lodash": "^4.17.21",
     "rxjs": "^7.8.2",
     "typescript": "^5.8.3",
-    "vscode-debugadapter": "^1.51.0"
+    "vscode-debugadapter": "^1.51.0",
+    "vscode-debugadapter-testsupport": "^1.51.0"
   }
 }

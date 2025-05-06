@@ -16,6 +16,15 @@
 				"${workspaceFolder}/out/**/*.js"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"type": "haskell",
+			"request": "launch",
+			"name": "Debug Cabal Project",
+			"program": "cabal repl --repl-no-load",
+			"activeFile": "${editor.document.fileName}",
+			"showIO": true,
+			"workspace": ""
 		}
 	]
 }
