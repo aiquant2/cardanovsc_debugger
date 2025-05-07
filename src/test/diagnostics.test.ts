@@ -1,189 +1,174 @@
-// jest.mock('vscode');
 
-// import * as vscode from 'vscode';
-// import { spawn } from 'child_process';
-// import * as path from 'path';
-// import { diagnosticCollection, startGhcidOnHaskellOpen, stopGhcid, parseCabalErrors, updateErrorDecorations } from '../diagnostics';
+import * as vscode from 'vscode';
+import { spawn } from 'child_process';
+import {
+  startGhcidOnHaskellOpen,
+  stopGhcid,
+  updateErrorDecorations,
+  diagnosticCollection,
+  parseCabalErrors,
+} from '../diagnostics';
 
-// jest.mock('child_process', () => ({
-//   spawn: jest.fn(),
-// }));
+jest.mock('vscode', () => {
+  const actualVscode = jest.requireActual('vscode');
 
-// jest.mock('vscode', () => ({
-//   ...jest.requireActual('vscode'),
-//   languages: {
-//     createDiagnosticCollection: jest.fn(() => ({
-//       clear: jest.fn(),
-//       set: jest.fn(),
-//     })),
-//   },
-//   window: {
-//     createStatusBarItem: jest.fn(() => ({
-//       show: jest.fn(),
-//       text: '',
-//       tooltip: '',
-//     })),
-//     onDidChangeActiveTextEditor: jest.fn(),
-//     showErrorMessage: jest.fn(),
-//     activeTextEditor: {
-//       document: {
-//         languageId: 'haskell',
-//       },
-//     },
-//   },
-//   workspace: {
-//     rootPath: '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/',
-//     onDidOpenTextDocument: jest.fn(),
-//     onDidChangeTextDocument: jest.fn(),
-//     textDocuments: [
-//       {
-//         uri: {
-//           fsPath: '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs',
-//         },
-//         languageId: 'haskell',
-//         lineAt: jest.fn(() => ({
-//           text: 'mock content',
-//         })),
-//       },
-//     ],
-//   },
-// }));
+  const mockTextDocument = {
+    uri: actualVscode.Uri.file('/home/kunal-kumar/cardanovsc_debugger/test/app/Main.hs'),
+    fileName: '/home/kunal-kumar/cardanovsc_debugger/test/app/Main.hs',
+    languageId: 'haskell',
+    lineAt: jest.fn(() => ({ text: 'import Something' })),
+    getText: jest.fn(() => ''),
+    isClosed: false,
+    version: 1,
+    isDirty: false,
+    isUntitled: false,
+    eol: 1,
+    save: jest.fn(),
+    lineCount: 10,
+  } as unknown as vscode.TextDocument;
 
-// describe('diagnostic.ts', () => {
-//   let context: vscode.ExtensionContext;
+  const mockEditor = {
+    document: mockTextDocument,
+    setDecorations: jest.fn(),
+  } as unknown as vscode.TextEditor;
 
-//   beforeEach(() => {
-//     context = {
-//       subscriptions: [],
-//     } as any;
-//   });
+  return {
+    ...actualVscode,
+    StatusBarAlignment: { Left: 1, Right: 2 },
+    OverviewRulerLane: { Left: 1, Center: 2, Right: 4 },
+    window: {
+      ...actualVscode.window,
+      createStatusBarItem: jest.fn(() => ({
+        show: jest.fn(),
+        text: '',
+        tooltip: '',
+      })),
+      createTextEditorDecorationType: jest.fn(() => ({
+        dispose: jest.fn(),
+      })),
+      onDidChangeActiveTextEditor: jest.fn(),
+      showErrorMessage: jest.fn(),
+      get activeTextEditor() {
+        return mockEditor;
+      },
+    },
+    languages: {
+      createDiagnosticCollection: jest.fn(() => mockDiagnosticCollection),
+    },
+    workspace: {
+      ...actualVscode.workspace,
+      rootPath: '/home/kunal-kumar/cardanovsc_debugger/test/app',
+      onDidOpenTextDocument: jest.fn(),
+      onDidChangeTextDocument: jest.fn(),
+      textDocuments: [mockTextDocument],
+    },
+  };
+});
 
-//   afterEach(() => {
-//     jest.clearAllMocks();
-//   });
+// Mock Diagnostic Collection
+export const mockDiagnosticCollection: vscode.DiagnosticCollection = {
+  clear: jest.fn(),
+  set: jest.fn(),
+  get: jest.fn(() => [
+    new vscode.Diagnostic(
+      new vscode.Range(0, 0, 0, 10),
+      'Mock error',
+      vscode.DiagnosticSeverity.Error
+    ),
+  ]),
+  delete: jest.fn(),
+  forEach: jest.fn(),
+  has: jest.fn(),
+  dispose: jest.fn(),
+  name: '',
+  [Symbol.iterator]
+    : function (): Iterator<[uri: vscode.Uri, diagnostics: readonly vscode.Diagnostic[]], any, any> {
+      throw new Error('Function not implemented.');
+    }
+};
 
-//   it('should initialize ghcid process on Haskell file open', async () => {
-//     const startGhcidMock = jest.spyOn(diagnosticCollection, 'clear');
-//     const mockSpawn = jest.fn().mockReturnValue({
-//       stdout: {
-//         on: jest.fn(),
-//       },
-//       stderr: {
-//         on: jest.fn(),
-//       },
-//       on: jest.fn(),
-//     });
+jest.mock('child_process', () => ({
+  spawn: jest.fn().mockReturnValue({
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    on: jest.fn(),
+    kill: jest.fn(),
+  }),
+}));
 
-//     (spawn as jest.Mock) = mockSpawn;
+describe('diagnostics.ts', () => {
+  let context: vscode.ExtensionContext;
+  const mockGhcidProcess = {
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    on: jest.fn(),
+    kill: jest.fn(),
+  };
 
-//     startGhcidOnHaskellOpen(context);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
 
-//     expect(mockSpawn).toHaveBeenCalledWith('ghcid', ['--command', 'cabal repl'], {
-//       cwd: '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/',
-//       shell: true,
-//     });
-//   });
+    (spawn as jest.Mock).mockReturnValue(mockGhcidProcess);
+  });
 
-//   it('should stop ghcid process when stopGhcid is called', () => {
-//     const mockGhcidProcess = {
-//       kill: jest.fn(),
-//     };
+  it('should stop ghcid process correctly', () => {
+    startGhcidOnHaskellOpen(context);
+    stopGhcid();
+    expect(mockGhcidProcess.kill).toHaveBeenCalled();
+  });
 
-//     (spawn as jest.Mock) = jest.fn().mockReturnValue(mockGhcidProcess);
+  it('should start ghcid process on Haskell file open', () => {
+    const mockSpawn = jest.fn().mockReturnValue({
+      stdout: { on: jest.fn() },
+      stderr: { on: jest.fn() },
+      on: jest.fn(),
+    });
 
-//     // Simulate the ghcid process running
-//     startGhcidOnHaskellOpen(context);
-//     stopGhcid();
+    (spawn as jest.Mock) = mockSpawn;
+    startGhcidOnHaskellOpen(context);
 
-//     expect(mockGhcidProcess.kill).toHaveBeenCalled();
-//   });
-
-//   it('should parse Cabal errors and update diagnostics correctly', () => {
-//     const output = `
-//       /home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs:1:1: error: some error message
-//       /home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs:2:5: warning: some warning message
-//     `;
-//     parseCabalErrors(output, '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs');
-
-//     // Verify that diagnostics were added correctly
-//     expect(diagnosticCollection.set).toHaveBeenCalled();
-//   });
-
-//   it('should update error decorations in active editor', () => {
-//     const mockActiveEditor = vscode.window.activeTextEditor;
-//     const mockDiagnostics = [
-//       new vscode.Diagnostic(
-//         new vscode.Range(0, 0, 0, 1),
-//         'Error message',
-//         vscode.DiagnosticSeverity.Error
-//       ),
-//     ];
-
-//     // Mock the `diagnosticCollection.get` method to return mock diagnostics
-//     (diagnosticCollection.get as jest.Mock).mockReturnValue(mockDiagnostics);
-
-//     updateErrorDecorations();
-//     if (mockActiveEditor) {
-//     // Check if decorations were applied
-//     expect(mockActiveEditor.setDecorations).toHaveBeenCalled();
-//     }
-//   });
-
-
-//   it('should handle ghcid output and create correct diagnostics', () => {
-//     const outputLines = [
-//       '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs:1:1: error: some error message',
-//       '/home/kunal-kumar/Desktop/ppbl2023-plutus-template/src/HelloWorld/Compiler.hs:2:5: warning: some warning message',
-//       'All good',
-//     ];
-
-//     const processGhcidOutputMock = jest.spyOn(diagnosticCollection, 'clear');
-// console.log("hii");
-
-// console.log(processGhcidOutputMock);
-
-//     // processGhcidOutputMock(outputLines);
-
-//     expect(processGhcidOutputMock).toHaveBeenCalled();
-//     expect(diagnosticCollection.set).toHaveBeenCalled();
-//   });
-// });
-
-// jest.mock('vscode', () => {
-//   const originalModule = jest.requireActual('vscode');
-//   return {
-//     ...originalModule,
-//     window: {
-//       ...originalModule.window,
-//       showInformationMessage: jest.fn(),
-//       showErrorMessage: jest.fn(),
-//     },
-//     commands: {
-//       ...originalModule.commands,
-//       registerCommand: jest.fn(),
-//     },
-//     debug: {
-//       ...originalModule.debug,
-//       registerDebugConfigurationProvider: jest.fn(),
-//       registerDebugAdapterDescriptorFactory: jest.fn(),
-//     },
-//     DebugAdapterInlineImplementation: jest.fn().mockImplementation(() => ({})),
-//   };
-// });
-
-// // diagnostics.test.ts
-// describe('Diagnostics Module', () => {
-//   it('should pass this placeholder test', () => {
-//     expect(true).toBe(true);
-//   });
-// });
-
-
-
-// src/test/diagnostics.test.ts
-describe('Diagnostics', () => {
-    it('should be a placeholder test until real tests are written', () => {
-      expect(true).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledWith('ghcid', ['--command', 'cabal repl'], {
+      cwd: '/home/kunal-kumar/cardanovsc_debugger/test/app',
+      shell: true,
     });
   });
-  
+
+  it('should parse Cabal errors and call set diagnostics', () => {
+    const output = `
+      /home/kunal-kumar/cardanovsc_debugger/test/app/Main.hs:1:1: error: some error message
+      /home/kunal-kumar/cardanovsc_debugger/test/app/Main.hs:2:5: warning: some warning message
+    `;
+
+    parseCabalErrors(
+      output,
+      '/home/kunal-kumar/cardanovsc_debugger/test/app/Main.hs',
+      vscode,
+      mockDiagnosticCollection as any
+    );
+
+    expect(mockDiagnosticCollection.set).toHaveBeenCalled(); // Check that diagnostics were set
+  });
+
+  it('should update error decorations in active editor', () => {
+    const fakeRange = new vscode.Range(0, 0, 0, 5);
+    const fakeDiagnostic = new vscode.Diagnostic(
+      fakeRange,
+      'Mock error',
+      vscode.DiagnosticSeverity.Error
+    );
+
+    // Setup diagnostics mock
+    mockDiagnosticCollection.get = jest.fn(() => [fakeDiagnostic]);
+
+    // Force updateErrorDecorations to use our mock diagnostic collection
+    (diagnosticCollection as any) = mockDiagnosticCollection;
+
+    // Call function under test
+    updateErrorDecorations();
+
+    // Assert setDecorations was called
+    const editor = vscode.window.activeTextEditor!;
+    expect(editor.setDecorations).toHaveBeenCalledWith(expect.anything(), [fakeRange]);
+  });
+});

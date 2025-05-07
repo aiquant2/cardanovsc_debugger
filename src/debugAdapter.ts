@@ -125,6 +125,7 @@ import * as child_process from 'child_process';
     
         this.ghciProcess.stdout?.on("data", (data: Buffer) => {
           const text = data.toString();
+     
           x+=text;
           this.sendEvent(new OutputEvent(text, 'stdout'));
     

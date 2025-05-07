@@ -1,8 +1,4 @@
 
-
-
-
-
 jest.mock('vscode', () => {
   const original = jest.requireActual('vscode');
   return {
