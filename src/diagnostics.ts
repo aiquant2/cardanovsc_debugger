@@ -143,59 +143,67 @@ function processGhcidOutput(lines: string[]) {
         severity: vscode.DiagnosticSeverity;
         message: string[];
     } | null = null;
-
-    const flushCurrentError = () => {
-        if (!currentError) {return;}
-
-        const filePath = path.resolve(vscode.workspace.rootPath || '', currentError.file);
-        const fileUri = vscode.Uri.file(filePath);
-        const lineNum = Math.max(0, currentError.line - 1);
-        const colNum = Math.max(0, currentError.col - 1);
-
-        // Create range - we'll try to get a better one if the document is open
-        let range = new vscode.Range(lineNum, colNum, lineNum, colNum + 1);
-
-        // Try to find the document to get more accurate range
-        const document = vscode.workspace.textDocuments.find(doc => 
-            doc.uri.fsPath === fileUri.fsPath
-        );
-        
-        if (document) {
-            try {
-                const lineText = document.lineAt(lineNum).text;
-                let endCol = colNum + 1;
-                // Try to find the end of the identifier
-                while (endCol < lineText.length && !/\s/.test(lineText[endCol])) {
-                    endCol++;
-                }
-                range = new vscode.Range(lineNum, colNum, lineNum, endCol);
-            } catch {
-                // Line number might be out of bounds, use default range
-            }
-        }
-
-        const cleanedMessage = currentError.message
-            .filter(line => !/^\s*\d+\s*\|/.test(line)) // Remove code context lines
-            .join('\n')
-            .trim();
-
-        const diagnostic = new vscode.Diagnostic(
-            range,
-            cleanedMessage,
-            currentError.severity
-        );
-        diagnostic.source = 'ghcid';
-        diagnostic.code = 'ghcid';
-
-        const existing = diagnosticsMap.get(fileUri.fsPath) || [];
-        existing.push(diagnostic);
-        diagnosticsMap.set(fileUri.fsPath, existing);
-
-        currentError = null;
-    };
+      const flushCurrentError = () => {
+          if (!currentError) return;
+          const filePath = path.resolve(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', currentError.file);
+          const fileUri = vscode.Uri.file(filePath);
+          const lineNum = Math.max(0, currentError.line - 1);
+          const colNum = Math.max(0, currentError.col - 1);
+          // Try to find the document to get the line text
+          const document = vscode.workspace.textDocuments.find(doc => 
+              doc.uri.fsPath === fileUri.fsPath
+          );
+          let range: vscode.Range;
+          let cleanedMessage = currentError.message
+              .filter(line => !/^\s*\d+\s*\|/.test(line)) // Remove code context lines
+              .join('\n')
+              .trim();
+          if (document) {
+              try {
+                  const lineText = document.lineAt(lineNum).text;
+                  // Special handling for import statements
+                  if (lineText.trim().startsWith("import")) {
+                      // Highlight the entire import statement including "import" keyword
+                      const importStart = lineText.indexOf("import");
+                      range = new vscode.Range(
+                          lineNum, 
+                          importStart,
+                          lineNum,
+                          lineText.length
+                      );
+                      // Keep the original message but add "Import error" prefix
+                      cleanedMessage = `Import error: ${cleanedMessage}`;
+                  } else {
+                      // Default behavior for non-import errors
+                      let endCol = colNum + 1;
+                      // Try to find the end of the identifier
+                      while (endCol < lineText.length && !/\s/.test(lineText[endCol])) {
+                          endCol++;
+                      }
+                      range = new vscode.Range(lineNum, colNum, lineNum, endCol);
+                  }
+              } catch {
+                  // Fallback if line number is out of bounds
+                  range = new vscode.Range(lineNum, colNum, lineNum, colNum + 1);
+              }
+          } else {
+              // Fallback if document not found
+              range = new vscode.Range(lineNum, colNum, lineNum, colNum + 1);
+          }
+          const diagnostic = new vscode.Diagnostic(
+              range,
+              cleanedMessage,
+              currentError.severity
+          );
+          diagnostic.source = 'ghcid';
+          diagnostic.code = 'ghcid';
+          const existing = diagnosticsMap.get(fileUri.fsPath) || [];
+          existing.push(diagnostic);
+          diagnosticsMap.set(fileUri.fsPath, existing);
+          currentError = null;
+      };
 
     let hasErrors = false;
-
     for (const line of lines) {
         if (line.includes('All good')) {
             statusBarItem.text = 'Haskell $(check)';
@@ -204,23 +212,20 @@ function processGhcidOutput(lines: string[]) {
             updateErrorDecorations();
             return;
         }
-
         if (line.includes('Loading...') || line.includes('Ok, modules loaded:')) {
             continue;
         }
-
         // More comprehensive error pattern matching
         const errorMatch = line.match(/^(.+?):(\d+):(\d+)(?:-(\d+))?:\s*(error|warning|\[error\]|\[warning\]):?\s*(.*)/);
         if (errorMatch) {
             flushCurrentError();
             hasErrors = true;
-
             currentError = {
                 file: errorMatch[1],
                 line: parseInt(errorMatch[2]),
                 col: parseInt(errorMatch[3]),
-                severity: errorMatch[5].toLowerCase().includes('error') 
-                    ? vscode.DiagnosticSeverity.Error 
+                severity: errorMatch[5].toLowerCase().includes('error')
+                    ? vscode.DiagnosticSeverity.Error
                     : vscode.DiagnosticSeverity.Warning,
                 message: [errorMatch[6].trim()]
             };
@@ -228,22 +233,19 @@ function processGhcidOutput(lines: string[]) {
             currentError.message.push(line.trim());
         }
     }
-
     flushCurrentError();
-
     if (hasErrors) {
         statusBarItem.text = 'Haskell $(error)';
         statusBarItem.tooltip = 'Haskell: Errors detected';
-        
         // Update diagnostics
         diagnosticCollection.clear();
         diagnosticsMap.forEach((diags, file) => {
             diagnosticCollection.set(vscode.Uri.file(file), diags);
         });
     }
-
     updateErrorDecorations();
 }
+
 
 export function updateErrorDecorations() {
     const activeEditor = vscode.window.activeTextEditor;
@@ -341,3 +343,7 @@ export function parseCabalErrors(
     }
   }
   
+
+
+
+
