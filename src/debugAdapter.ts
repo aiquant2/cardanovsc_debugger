@@ -3,6 +3,7 @@ import {
     DebugSession,
     InitializedEvent,
     OutputEvent,
+    StoppedEvent,
     TerminatedEvent,
   } from "vscode-debugadapter";
   import { DebugProtocol } from "vscode-debugprotocol";
@@ -65,8 +66,121 @@ import * as child_process from 'child_process';
     
         this.sendResponse(response);
 
-
       }
+
+      // variable panel  
+
+protected threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): void {
+  console.log("threadsRequest called");
+      
+        response.body = {
+          threads: [
+            {
+              id: 1,
+              name: "Main Thread"
+            }
+          ]
+        };
+      
+        this.sendResponse(response);
+  
+}
+      protected scopesRequest(
+        response: DebugProtocol.ScopesResponse,
+        args: DebugProtocol.ScopesArguments
+      ): void {
+        console.log("scopesRequest called",args);
+
+        const scopes: DebugProtocol.Scope[] = [
+          {
+            name: "File Info",
+            variablesReference: 1000, // Arbitrary reference ID
+            expensive: false
+          }
+        ];
+      
+        response.body = { scopes };
+        this.sendResponse(response);
+      }
+      
+      
+      protected async variablesRequest(
+        response: DebugProtocol.VariablesResponse,
+        args: DebugProtocol.VariablesArguments
+      ): Promise<void> {
+
+        const variables: DebugProtocol.Variable[] = [];
+        
+        console.log("variablesRequest called", args);
+        const filePath=this.launchArgs?.activeFile ;
+        
+        if (filePath){
+          const content = fs.readFile(filePath, 'utf8');
+          
+          
+          // Match lines that look like function definitions
+          const functionRegex = /^([a-zA-Z0-9_']+)\s+((?:[a-zA-Z0-9_']+\s*)+)?=/gm;
+          
+          const fileName = filePath.split(/[\\/]/).pop() || "";
+          const dirName = filePath.substring(0, filePath.lastIndexOf(fileName));
+          
+          variables.push({
+            name: "File :",
+            value: fileName,
+            variablesReference: 0
+                });
+            
+                variables.push({
+                  name: "Directory :",
+                  value: dirName,
+                  variablesReference: 0
+                });
+                let match;
+                while ((match = functionRegex.exec( await content)) !== null) {
+                  const name = match[1];
+                  const args = match[2]?.trim() || "(no arguments)";
+                  variables.push({
+                    name: `Function: ${name}`,
+                    value: `Arguments: ${args}`,
+                    variablesReference: 0
+                  });
+                }
+          
+        }
+      
+        response.body = { variables };
+        this.sendResponse(response);
+      }
+
+      protected async stackTraceRequest(
+        response: DebugProtocol.StackTraceResponse,
+        args: DebugProtocol.StackTraceArguments
+      ): Promise<void> {
+        console.log("stacktracerequest called ", args);
+        
+        const stackFrames: DebugProtocol.StackFrame[] = [
+          {
+            id: 1,
+            name: "main",
+            line: 1,
+            column: 1,
+            source: {
+              name: "main",
+              path: this.launchArgs?.activeFile || "unknown"
+            }
+          }
+        ];
+
+        response.body = {
+          stackFrames,
+          totalFrames: stackFrames.length
+        };
+        this.sendResponse(response);
+      }
+      
+      // end of variable panel  
+
+    
       static ghciProcess: any;
       static initializeRequest(response: { body: {}; }, args: {}) {
           throw new Error('Method not implemented.');
@@ -95,6 +209,8 @@ import * as child_process from 'child_process';
       response.body.supportsRestartRequest = true;
       this.sendResponse(response);
       this.sendEvent(new InitializedEvent());
+
+      console.log("initializeRequest triggered");
     }
    
    
@@ -144,6 +260,14 @@ import * as child_process from 'child_process';
         const [cmd, ...cmdArgs] = programCommand.split(" ");
     
         this.sendEvent(new OutputEvent("Launching GHCi...\n", 'console'));
+
+        this.sendResponse(response);
+
+        this.sendEvent(new StoppedEvent("entry", 1)); // threadId = 1
+
+        console.log("launchRequest triggered");
+console.log("StoppedEvent sent");
+
     
         this.ghciProcess = child_process.spawn(cmd, cmdArgs, {
           cwd: workspaceFolder,

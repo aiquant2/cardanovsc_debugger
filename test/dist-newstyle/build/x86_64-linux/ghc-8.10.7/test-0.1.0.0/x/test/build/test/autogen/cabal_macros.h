@@ -20,6 +20,16 @@
   (major1) == 4 && (major2) <  14 || \
   (major1) == 4 && (major2) == 14 && (minor) <= 3)
 #endif /* MIN_VERSION_base */
+/* package breakpoint-0.1.2.2 */
+#ifndef VERSION_breakpoint
+#define VERSION_breakpoint "0.1.2.2"
+#endif /* VERSION_breakpoint */
+#ifndef MIN_VERSION_breakpoint
+#define MIN_VERSION_breakpoint(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  1 || \
+  (major1) == 0 && (major2) == 1 && (minor) <= 2)
+#endif /* MIN_VERSION_breakpoint */
 
 /* tool gcc-13 */
 #ifndef TOOL_VERSION_gcc

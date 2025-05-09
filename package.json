@@ -70,6 +70,11 @@
       {
         "command": "cardanovscDebugger.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "extension.extractHaskellFunctions",
+        "title": "extract function",
+        "category": "test"
       }
     ]
   },

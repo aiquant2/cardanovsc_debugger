@@ -5,6 +5,37 @@ import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
 
 
 export function activate(context: vscode.ExtensionContext) {
+    // extract all the function name 
+
+    // const disposable1 = vscode.commands.registerCommand('extension.extractHaskellFunctions', () => {
+    //     const editor = vscode.window.activeTextEditor;
+    
+    //     if (!editor) {
+    //       vscode.window.showErrorMessage('No active editor found!');
+    //       return;
+    //     }
+    
+    //     const document = editor.document;
+    
+    //     if (!document.fileName.endsWith('.hs')) {
+    //       vscode.window.showWarningMessage('This is not a Haskell file.');
+    //       return;
+    //     }
+    
+    //     const text = document.getText();
+    //     const functionNames = extractHaskellFunctions(text);
+    
+    //     if (functionNames.length === 0) {
+    //       vscode.window.showInformationMessage('No functions found.');
+    //     } else {
+    //       vscode.window.showInformationMessage(`Functions found: ${functionNames.join(', ')}`);
+    //     }
+    //   });
+    
+    //   context.subscriptions.push(disposable1);
+    // end of functionname 
+    
+    
     console.log('Haskell Debugger extension activated');
 
     // Start Ghcid and Diagnostics when opening a Haskell file
@@ -151,3 +182,15 @@ export class HaskellConfigurationProvider implements vscode.DebugConfigurationPr
 
 
 
+
+// function extractHaskellFunctions(code: string): string[] {
+//     const functionRegex = /^([a-z][\w']*)\s*(::|=)/gm;
+//     const functions: string[] = [];
+//     let match: RegExpExecArray | null;
+  
+//     while ((match = functionRegex.exec(code)) !== null) {
+//       functions.push(match[1]);
+//     }
+  
+//     return Array.from(new Set(functions)); // Remove duplicates
+//   }

@@ -1,23 +1,20 @@
--- module Main where
+{-# OPTIONS_GHC -fplugin Debug.Breakpoint #-}
 
--- main :: IO ()
--- main = putStrLn "Hello, Haskell!"
+module Main where
 
-
--- SimpleCalculator.hs
-module SimpleCalculator where
+import Debug.Breakpoint
 
 -- Function to add two numbers
 add :: Int -> Int -> Int
 add x y = x + y
 
 -- Function to subtract two numbers
-subtract :: Int -> Int -> Int
-subtract x y = x - y
+subtract' :: Int -> Int -> Int  -- Renamed to avoid conflict with Prelude.subtract
+subtract' x y = x - y
 
 -- Function to multiply two numbers
 multiply :: Int -> Int -> Int
-multiply x y = x * y
+multiply x y = breakpoint (x * y)  -- Breakpoint here
 
 -- Function to divide two numbers
 divide :: Int -> Int -> Either String Int
@@ -30,7 +27,7 @@ main = do
     let a = 10
     let b = 5
     putStrLn ("Addition: " ++ show (add a b))
-    putStrLn ("Subtraction: " ++ show (subtract a b))
+    putStrLn ("Subtraction: " ++ show (subtract' a b))
     putStrLn ("Multiplication: " ++ show (multiply a b))
     case divide a b of
         Left errMsg -> putStrLn errMsg
