@@ -27,6 +27,7 @@ export interface HaskellLaunchRequestArguments
 }
 
 export class HaskellDebugSession extends DebugSession {
+  _flag:boolean | undefined
   _currentLine!: number;
   _breakpoints: any;
   static launchArgs: any;
@@ -45,8 +46,8 @@ export class HaskellDebugSession extends DebugSession {
     response: DebugProtocol.RestartResponse,
     args: DebugProtocol.RestartArguments
   ) {
-  console.log("called again restartrequest");
-  
+    console.log("called again restartrequest");
+
     this.sendEvent(new OutputEvent("Restarting debug session...\n", "console"));
     this.sendResponse(response);
   }
@@ -147,7 +148,7 @@ export class HaskellDebugSession extends DebugSession {
         variablesReference: 0,
       });
       let match;
-      
+
       while ((match = functionRegex.exec(await content)) !== null) {
         const name = match[1];
         const args = match[2]?.trim() || "(no arguments)";
@@ -162,74 +163,114 @@ export class HaskellDebugSession extends DebugSession {
 
     response.body = { variables };
     this.sendResponse(response);
-  } 
-
-protected async stackTraceRequest(
-  response: DebugProtocol.StackTraceResponse,
-  args: DebugProtocol.StackTraceArguments
-): Promise<void> {
-  console.log("stackTraceRequest called with arguments:", args);
-
-  const activeFile = this.launchArgs?.activeFile || "unknown";
-
-  // Simulate a current stack trace with one or more frames
-  const stackFrames: DebugProtocol.StackFrame[] = [];
-
-  if (this._currentLine !== undefined) {
-    stackFrames.push({
-      id: 1,
-      name: "main",
-      line: this._currentLine,
-      column: 1,
-      source: {
-        name: path.basename(activeFile),
-        path: activeFile,
-      },
-    });
   }
 
+  protected async stackTraceRequest(
+    response: DebugProtocol.StackTraceResponse,
+    args: DebugProtocol.StackTraceArguments
+  ): Promise<void> {
+    console.log("stackTraceRequest called with arguments:", args);
 
-  response.body = {
-    stackFrames,
-    totalFrames: stackFrames.length,
-  };
+    const activeFile = this.launchArgs?.activeFile || "unknown";
 
-  this.sendResponse(response);
-}
+    // Simulate a current stack trace with one or more frames
+    const stackFrames: DebugProtocol.StackFrame[] = [];
 
+    if (this._currentLine !== undefined) {
+      stackFrames.push({
+        id: 1,
+        name: "main",
+        line: this._currentLine,
+        column: 1,
+        source: {
+          name: path.basename(activeFile),
+          path: activeFile,
+        },
+      });
+    }
 
+    response.body = {
+      stackFrames,
+      totalFrames: stackFrames.length,
+    };
+
+    this.sendResponse(response);
+  }
 
   protected setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
     args: DebugProtocol.SetBreakpointsArguments
   ): void {
     console.log("setBreakPointsRequest called", args);
-  
-    
-    const breakpoints = args.breakpoints?.map(bp => bp.line) || [];
-  
+
+    const breakpoints = args.breakpoints?.map((bp) => bp.line) || [];
+
     this._breakpoints = breakpoints; // ✅ Initialize your internal breakpoints list
-  
+
     response.body = {
-      breakpoints: breakpoints.map(line => ({
+      breakpoints: breakpoints.map((line) => ({
         verified: true,
-        line
-      }))
+        line,
+      })),
     };
-  
+
     console.log("setBreakPointsRequest", this._breakpoints);
     if (this.launchArgs) {
-       this.launchRequest(response, this.launchArgs);
+      this.launchRequest(response, this.launchArgs);
     } else {
       this.sendErrorResponse(response, {
         id: 1004,
         format: "Cannot restart: No previous launch configuration available",
       });
-    }    this.sendResponse(response);
+    }
+    this.sendResponse(response);
   }
-  
 
   // updated one **
+
+  // protected nextRequest(
+  //   response: DebugProtocol.NextResponse,
+  //   args: DebugProtocol.NextArguments
+  // ): void {
+  //   console.log("nextRequest called with threadId:", args.threadId);
+
+  //   // If no breakpoints exist, just continue execution
+  //   if (!this._breakpoints || this._breakpoints.length === 0) {
+  //     console.log("No breakpoints set — continuing execution.");
+  //     this._flag=true;
+  //     this.sendResponse(response);
+  //     return;
+  //   }
+
+  //   const currentIdx = this._breakpoints.indexOf(this._currentLine);
+
+  //   if (currentIdx === -1) {
+  //     console.log(
+  //       `Current line (${this._currentLine}) not found in breakpoints — continuing.`
+  //     );
+  //     this._flag=true;
+  //     this.sendResponse(response);
+  //     return;
+  //   }
+
+  //   if (currentIdx < this._breakpoints.length - 1) {
+  //     this._currentLine = this._breakpoints[currentIdx + 1];
+  //     console.log("Stepped to next breakpoint at line", this._currentLine);
+  //     this._flag=false;
+  //     // Simulate pause at next breakpoint
+  //     this.sendEvent(new StoppedEvent("step", args.threadId));
+  //   } else {
+  //     this._flag=true;
+  //     console.log(
+  //       "Already at the last breakpoint — no further steps available."
+  //     );
+
+  //     // Optional: send a continued or terminated event here
+  //     this.sendEvent(new ContinuedEvent(args.threadId));
+  //   }
+
+  //   this.sendResponse(response);
+  // }
 
   protected nextRequest(
     response: DebugProtocol.NextResponse,
@@ -237,42 +278,61 @@ protected async stackTraceRequest(
   ): void {
     console.log("nextRequest called with threadId:", args.threadId);
   
-    // If no breakpoints exist, just continue execution
+    // Case 1: No breakpoints set
     if (!this._breakpoints || this._breakpoints.length === 0) {
       console.log("No breakpoints set — continuing execution.");
+      this._flag = true;
       this.sendResponse(response);
       return;
     }
   
+    // Find index of the current line in breakpoints
     const currentIdx = this._breakpoints.indexOf(this._currentLine);
   
+    // Case 2: Current line is not in breakpoints
     if (currentIdx === -1) {
       console.log(
         `Current line (${this._currentLine}) not found in breakpoints — continuing.`
       );
+      this._flag = true;
       this.sendResponse(response);
       return;
     }
   
+    // Case 3: There are more breakpoints ahead — step to next
     if (currentIdx < this._breakpoints.length - 1) {
       this._currentLine = this._breakpoints[currentIdx + 1];
       console.log("Stepped to next breakpoint at line", this._currentLine);
+      this._flag = false;
   
-      // Simulate pause at next breakpoint
+      // Simulate pause at the next breakpoint
       this.sendEvent(new StoppedEvent("step", args.threadId));
-    } else {
-      console.log(
-        "Already at the last breakpoint — no further steps available."
-      );
-  
-      // Optional: send a continued or terminated event here
+    } 
+    // Case 4: Already at the last breakpoint
+    else {
+      console.log("Already at the last breakpoint — no further steps available.");
+      this._flag = true;
+      if (this.launchArgs) {
+        this.launchRequest(response, this.launchArgs);
+     } else {
+       this.sendErrorResponse(response, {
+         id: 1004,
+         format: "Cannot restart: No previous launch configuration available",
+       });
+     }
+      // Optionally notify client that execution is continued
       this.sendEvent(new ContinuedEvent(args.threadId));
-    }
   
+      // Or optionally end debugging session
+      // this.sendEvent(new TerminatedEvent());
+    }
+
+     this._flag = true;
+
+    // Send response after handling all conditions
     this.sendResponse(response);
   }
   
-
   // end of variable panel
 
   static ghciProcess: any;
@@ -311,6 +371,7 @@ protected async stackTraceRequest(
     response: DebugProtocol.LaunchResponse,
     args: HaskellLaunchRequestArguments
   ): Promise<void> {
+
     try {
       diagnosticCollection.clear();
 
@@ -357,32 +418,34 @@ protected async stackTraceRequest(
       this.sendEvent(new OutputEvent("Launching GHCi...\n", "console"));
 
       this.sendResponse(response);
-      
+
       this._currentFilePath = this.launchArgs?.activeFile || "unknown";
 
       this._currentLine = this._breakpoints[0] || 1; // or any initial value
-
 
       this.sendEvent(new StoppedEvent("entry", 1)); // threadId = 1
 
       console.log("launchRequest triggered");
       console.log("StoppedEvent sent");
 
+     if(this._flag){
       this.ghciProcess = child_process.spawn(cmd, cmdArgs, {
         cwd: workspaceFolder,
         shell: true,
       });
 
+      console.log("GHCi PID:", this.ghciProcess?.pid); 
+      
       this.ghciProcess.stdout?.on("data", (data: Buffer) => {
         const text = data.toString();
-
+        
         x += text;
         this.sendEvent(new OutputEvent(text, "stdout"));
-
+        this._flag=false;
         if (
           (text.includes("Prelude>") ||
-            text.includes("*Main>") ||
-            text.includes("Ok,")) &&
+          text.includes("*Main>") ||
+          text.includes("Ok,")) &&
           !this.isFileLoaded
         ) {
           if (args.activeFile) {
@@ -390,13 +453,13 @@ protected async stackTraceRequest(
           }
         }
       });
-
+      
       this.ghciProcess.stderr?.on("data", (data: Buffer) => {
         y += data.toString();
         parseCabalErrors(x + y, y);
         this.sendEvent(new OutputEvent(data.toString(), "stderr"));
       });
-
+      
       this.ghciProcess.on("exit", (code) => {
         if (!this.isRestarting) {
           this.sendEvent(
@@ -405,6 +468,8 @@ protected async stackTraceRequest(
           this.sendEvent(new TerminatedEvent());
         }
       });
+      this._flag=false;
+    }
 
       if (args.activeFile) {
         await this.loadHaskellFile(args.activeFile);
@@ -538,7 +603,11 @@ protected async stackTraceRequest(
     this.sendResponse(response);
   }
 
-  protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request): void {
-     this.launchRequest(response,args)
+  protected attachRequest(
+    response: DebugProtocol.AttachResponse,
+    args: DebugProtocol.AttachRequestArguments,
+    request?: DebugProtocol.Request
+  ): void {
+    this.launchRequest(response, args);
   }
 }
