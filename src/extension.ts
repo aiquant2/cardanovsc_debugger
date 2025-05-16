@@ -7,7 +7,8 @@ import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
 export function activate(context: vscode.ExtensionContext) {
     
     console.log('Haskell Debugger extension activated');
-
+    
+    
     // Start Ghcid and Diagnostics when opening a Haskell file
     startGhcidOnHaskellOpen(context);
 
