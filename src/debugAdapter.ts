@@ -14,7 +14,11 @@ import * as vscode from "vscode";
 import * as fs from "fs/promises";
 import { diagnosticCollection, parseCabalErrors } from "./diagnostics";
 import path from "path";
-
+import { Thread } from "@vscode/debugadapter";
+export interface thread extends DebugProtocol.Thread{
+  id:number,
+  name:string
+}
 export interface HaskellLaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
   program?: string;
@@ -28,38 +32,42 @@ export interface HaskellLaunchRequestArguments
 }
 
 export class HaskellDebugSession extends DebugSession {
-  _flag:boolean | undefined
-  _currentLine!: number;
-  _breakpoints: any;
-  static launchArgs: any;
-  _currentFilePath!: string;
-
+public ghciProcess: child_process.ChildProcess | undefined;
+private isFileLoaded = false;
+private loadDebounceTimer: NodeJS.Timeout | undefined;
+private lastLoadedFileContent: string | undefined;
+private launchArgs: HaskellLaunchRequestArguments | undefined;
+private isRestarting = false;
+private static THREAD_ID = 1;
+private datumValue: string = "";
+_flag:boolean =false;
+_currentLine!: number;
+_breakpoints: any;
+_currentFilePath!: string;
 
   // variable panel
 
-  protected threadsRequest(
+  protected threadsRequest (
     response: DebugProtocol.ThreadsResponse,
-    request?: DebugProtocol.Request
+    _request?: DebugProtocol.Request
   ): void {
     
-    console.log("threadsRequest called");
 
     response.body = {
+   
       threads: [
-        {
-          id: 1,
-          name: "Main Thread",
-        },
-      ],
+        new Thread(HaskellDebugSession.THREAD_ID,"main")
+      ]
     };
 
     this.sendResponse(response);
   }
+
+
   protected scopesRequest(
     response: DebugProtocol.ScopesResponse,
     args: DebugProtocol.ScopesArguments
   ): void {
-    console.log("scopesRequest called", args);
 
     const scopes: DebugProtocol.Scope[] = [
       {
@@ -72,6 +80,15 @@ export class HaskellDebugSession extends DebugSession {
     response.body = { scopes };
     this.sendResponse(response);
   }
+
+
+
+private _variableStore: Map<string, Map<string, string>> = new Map(); // functionName → { argName → value }
+private _functions: Map<string, string[]> = new Map(); // functionName → [arg1, arg2, ...]
+
+
+  
+  // 2 no.  new variable request(updated)
 
   protected async variablesRequest(
     response: DebugProtocol.VariablesResponse,
@@ -87,33 +104,36 @@ export class HaskellDebugSession extends DebugSession {
   
     variables.push(
       { name: "File", value: fileName, variablesReference: 0 },
-      { name: "Directory", value: dirName, variablesReference: 0 }
+      { name: "Directory", value: dirName, variablesReference: 0 },
+      { name: "f: myValidator", value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,variablesReference:0},
+      { name: "dataum", value: this.datumValue || "<not set>",variablesReference:0,evaluateName:"cborHex"}
     );
   
     if (filePath && currentLine !== undefined) {
       const content = await fs.readFile(filePath, "utf8");
-      const lines = content.split("\n");
+      const lines = content.split("\n").slice(0, currentLine); // Analyze up to the current line
   
-      // Start from currentLine - 1 and move upwards to find the first function
-      const functionRegex = /^([a-zA-Z0-9_']+)\s*((?:[a-zA-Z0-9_']+\s*)*)=/;
+      // Function pattern: name arg1 arg2 ... =
+      const functionRegex = /^([a-zA-Z_][a-zA-Z0-9_']*)\s*((?:[a-zA-Z0-9_']+\s*)*)=/;
   
-      for (let i = currentLine - 1; i >= 0; i--) {
+      for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         const match = functionRegex.exec(line);
         if (match) {
           const name = match[1];
           const args = match[2]?.trim() || "(no arguments)";
+          const lineNum = i + 1;
+  
           variables.push({
-            name: `Function`,
+            name: `Function (line ${lineNum})`,
             value: `${name} ${args}`,
             variablesReference: 0,
           });
   
-          // Also push individual arguments
           if (args !== "(no arguments)") {
             args.split(/\s+/).forEach((arg, index) => {
               variables.push({
-                name: `arg${index + 1}`,
+                name: `  └─ arg${index + 1}`,
                 value: arg,
                 variablesReference: 0,
               });
@@ -126,6 +146,7 @@ export class HaskellDebugSession extends DebugSession {
     response.body = { variables };
     this.sendResponse(response);
   }
+
 
   protected async stackTraceRequest(
     response: DebugProtocol.StackTraceResponse,
@@ -156,12 +177,31 @@ export class HaskellDebugSession extends DebugSession {
     this.sendResponse(response);
   }
 
-
+  protected setVariableRequest(
+    response: DebugProtocol.SetVariableResponse,
+    args: DebugProtocol.SetVariableArguments,
+    request?: DebugProtocol.Request
+  ): void {
+    // Extract info from args
+    const { variablesReference, name, value } = args;
+  
+  
+    // You should apply the value update to the backend/debugged program here.
+    // For example, call your internal logic to update the variable value.
+  
+    // Dummy implementation: simply echo the input
+    response.body = {
+      value: value,
+      variablesReference: 0 // 0 means it's not an object with child properties
+    };
+  
+    this.sendResponse(response);
+  }
+  
   protected setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
     args: DebugProtocol.SetBreakpointsArguments
   ): void {
-    console.log("setBreakPointsRequest called", args);
 
     const breakpoints = args.breakpoints?.map((bp) => bp.line) || [];
 
@@ -174,7 +214,6 @@ export class HaskellDebugSession extends DebugSession {
       })),
     };
 
-    console.log("setBreakPointsRequest", this._breakpoints);
     if (this.launchArgs) {
       this.launchRequest(response, this.launchArgs);
     } else {
@@ -187,24 +226,35 @@ export class HaskellDebugSession extends DebugSession {
   }
 
 
+// 2 no.  
+
+
+// old working
+
   protected async nextRequest(
     response: DebugProtocol.NextResponse,
     args: DebugProtocol.NextArguments
   ): Promise<void> {
-    console.log("nextRequest called with threadId:", args.threadId);
   
     if (!this._breakpoints || this._breakpoints.length === 0) {
-      console.log("No breakpoints set — continuing execution.");
       this._flag = true;
+      
       this.sendResponse(response);
+      if (this.launchArgs) {
+        await this.launchRequest(response, this.launchArgs);
+      } else {
+        this.sendErrorResponse(response, {
+          id: 1004,
+          format: "Cannot restart: No previous launch configuration available",
+        });
+      }
       return;
     }
   
     // First step
     if (this._currentLine === undefined) {
       this._currentLine = this._breakpoints[0];
-      console.log("Starting at first breakpoint:", this._currentLine);
-      this.sendEvent(new StoppedEvent("breakpoint", args.threadId));
+      this.sendEvent(new StoppedEvent("breakpoint", HaskellDebugSession.THREAD_ID));
       this.sendResponse(response);
       return;
     }
@@ -213,36 +263,110 @@ export class HaskellDebugSession extends DebugSession {
   
     if (currentIdx === -1 || currentIdx === this._breakpoints.length - 1) {
       // No more breakpoints — continue execution
-      console.log("No more breakpoints. Continuing...");
       this._currentLine === undefined;
       this._flag = true;
   
-      this.sendEvent(new ContinuedEvent(args.threadId));
+      this.sendEvent(new ContinuedEvent(HaskellDebugSession.THREAD_ID));
       this.sendResponse(response);
+      if (this.launchArgs) {
+        await this.launchRequest(response, this.launchArgs);
+      } else {
+        this.sendErrorResponse(response, {
+          id: 1004,
+          format: "Cannot restart: No previous launch configuration available",
+        });
+      }
       return;
     }
   
     // Move to next breakpoint
     this._currentLine = this._breakpoints[currentIdx + 1];
-    console.log("Stepped to breakpoint at line:", this._currentLine);
     this._flag = false;
   
-    this.sendEvent(new StoppedEvent("step", args.threadId));
+    this.sendEvent(new StoppedEvent("step", HaskellDebugSession.THREAD_ID));
     this.sendResponse(response);
   }
 
+
+// step in 
+
+
+  // protected async stepInRequest(
+  //   response: DebugProtocol.StepInResponse,
+  //   args: DebugProtocol.StepInArguments
+  // ): Promise<void> {
+  //   console.log("stepInRequest called at line", this._currentLine);
+  
+  //   if (!this._currentFilePath || this._currentLine === undefined) {
+  //     console.log("No current file or line to step into.");
+  //     this.sendResponse(response);
+  //     return;
+  //   }
+  
+  //   const content = await fs.readFile(this._currentFilePath, "utf8");
+  //   const lines = content.split("\n");
+  //   const currentLineText = lines[this._currentLine - 1]?.trim();
+  
+  //   console.log("hiiiii");
+    
+  //   // Regex to match function call: e.g., `foo a b`
+  //   const functionCallRegex = /^([a-zA-Z_][a-zA-Z0-9_']*)\s+((?:[a-zA-Z0-9_']+\s*)*)$/;
+  //   const match = functionCallRegex.exec(currentLineText);
+  
+  //   if (!match) {
+  //     console.log("No function call detected on this line.");
+  //     this.sendEvent(new StoppedEvent("step", args.threadId));
+  //     this.sendResponse(response);
+  //     return;
+  //   }
+  
+  //   const calledFunction = match[1];
+  //   const callArgs = match[2]?.trim().split(/\s+/) || [];
+  
+  //   // Search for the function definition line
+  //   const functionDefRegex = new RegExp(
+  //     `^${calledFunction}\\s+((?:[a-zA-Z0-9_']+\\s*)*)=`
+  //   );
+  
+  //   let defLine = -1;
+  //   for (let i = 0; i < lines.length; i++) {
+  //     if (functionDefRegex.test(lines[i])) {
+  //       defLine = i + 1;
+  //       break;
+  //     }
+  //   }
+  
+  //   if (defLine === -1) {
+  //     console.log(`Function definition for ${calledFunction} not found.`);
+  //     this.sendResponse(response);
+  //     return;
+  //   }
+  
+  //   // Set the new current line to the function definition line
+  //   this._currentLine = defLine;
+  
+  //   // Set up variable context (arguments)
+  //   this._variables = [
+  //     {
+  //       name: `Function`,
+  //       value: calledFunction,
+  //       variablesReference: 0,
+  //     },
+  //     ...callArgs.map((arg, i) => ({
+  //       name: `arg${i + 1}`,
+  //       value: arg,
+  //       variablesReference: 0,
+  //     })),
+  //   ];
+  
+  //   this.sendEvent(new StoppedEvent("step", args.threadId));
+  //   this.sendResponse(response);
+  // }
+  
+  
   // end of variable panel
 
-  static ghciProcess: any;
-  static initializeRequest(response: { body: {} }, args: {}) {
-    throw new Error("Method not implemented.");
-  }
-  public ghciProcess: child_process.ChildProcess | undefined;
-  private isFileLoaded = false;
-  private loadDebounceTimer: NodeJS.Timeout | undefined;
-  private lastLoadedFileContent: string | undefined;
-  private launchArgs: HaskellLaunchRequestArguments | undefined;
-  private isRestarting = false;
+
 
   public constructor() {
     super();
@@ -262,8 +386,6 @@ export class HaskellDebugSession extends DebugSession {
     response.body.supportsRestartRequest = true;
     this.sendResponse(response);
     this.sendEvent(new InitializedEvent());
-    this._flag=true;
-    console.log("initializeRequest triggered");
   }
 
   public async launchRequest(
@@ -272,7 +394,8 @@ export class HaskellDebugSession extends DebugSession {
   ): Promise<void> {
     try {
       diagnosticCollection.clear();
-  
+   console.log(this._currentLine);
+   
       let x = "";
       let y = "";
   
@@ -306,7 +429,7 @@ export class HaskellDebugSession extends DebugSession {
       }
   
       // 🔁 Reset critical flags and clean previous state
-      this._flag = true;
+    
       this.isFileLoaded = false;
       this.isRestarting = false;
   
@@ -331,7 +454,11 @@ export class HaskellDebugSession extends DebugSession {
         this._currentLine = this._breakpoints[0];
         this.sendEvent(new StoppedEvent("breakpoint", 1));
       }
-  
+     
+      
+  if(this._currentLine==-1){
+    this._flag=true;
+  }
       // Launch GHCi only once per launch
       if (this._flag) {
         this.ghciProcess = child_process.spawn(cmd, cmdArgs, {
@@ -393,6 +520,7 @@ export class HaskellDebugSession extends DebugSession {
     args: DebugProtocol.RestartArguments
   ): Promise<void> {
     try {
+      this._flag=false;
       this.isRestarting = true;
       this.sendEvent(new OutputEvent("Restarting debug session...\n"));
 
@@ -503,6 +631,10 @@ export class HaskellDebugSession extends DebugSession {
       this.ghciProcess.kill();
       this.ghciProcess = undefined;
     }
+
+    
+
+
     this.sendEvent(new TerminatedEvent());
     this.sendResponse(response);
   }
