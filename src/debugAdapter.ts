@@ -44,6 +44,13 @@ _flag:boolean =false;
 _currentLine!: number;
 _breakpoints: any;
 _currentFilePath!: string;
+private _currentLineContent: string = "";
+
+
+private getCalledFunctionName(line: string): string | null {
+  const match = line.match(/([a-zA-Z_][a-zA-Z0-9_']*)\s+/);
+  return match ? match[1] : null;
+}
 
   // variable panel
 
@@ -87,66 +94,59 @@ private _variableStore: Map<string, Map<string, string>> = new Map(); // functio
 private _functions: Map<string, string[]> = new Map(); // functionName → [arg1, arg2, ...]
 
 
-  
-  // 2 no.  new variable request(updated)
+// 4 no.  
 
-  protected async variablesRequest(
-    response: DebugProtocol.VariablesResponse,
-    args: DebugProtocol.VariablesArguments
-  ): Promise<void> {
-    const variables: DebugProtocol.Variable[] = [];
-  
-    const filePath = this.launchArgs?.activeFile;
-    const currentLine = this._currentLine;
-  
-    const fileName = path.basename(filePath || "unknown");
-    const dirName = path.dirname(filePath || "unknown");
-  
-    variables.push(
-      { name: "File", value: fileName, variablesReference: 0 },
-      { name: "Directory", value: dirName, variablesReference: 0 },
-      { name: "f: myValidator", value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,variablesReference:0},
-      { name: "dataum", value: this.datumValue || "<not set>",variablesReference:0,evaluateName:"cborHex"}
-    );
-  
-    if (filePath && currentLine !== undefined) {
-      const content = await fs.readFile(filePath, "utf8");
-      const lines = content.split("\n").slice(0, currentLine); // Analyze up to the current line
-  
-      // Function pattern: name arg1 arg2 ... =
-      const functionRegex = /^([a-zA-Z_][a-zA-Z0-9_']*)\s*((?:[a-zA-Z0-9_']+\s*)*)=/;
-  
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        const match = functionRegex.exec(line);
-        if (match) {
-          const name = match[1];
-          const args = match[2]?.trim() || "(no arguments)";
-          const lineNum = i + 1;
-  
+protected async variablesRequest(
+  response: DebugProtocol.VariablesResponse,
+  args: DebugProtocol.VariablesArguments
+): Promise<void> {
+  const variables: DebugProtocol.Variable[] = [];
+
+  const filePath = this.launchArgs?.activeFile;
+  const currentLine = this._currentLine;
+
+  const fileName = path.basename(filePath || "unknown");
+  const dirName = path.dirname(filePath || "unknown");
+
+  variables.push(
+    { name: "File", value: fileName, variablesReference: 0 },
+    { name: "Directory", value: dirName, variablesReference: 0 },
+    { name: "f: myValidator", value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`, variablesReference: 0 },
+    { name: "datum", value: this.datumValue || "<not set>", variablesReference: 0, evaluateName: "cborHex" }
+  );
+
+  if (filePath && currentLine !== undefined) {
+    const content = await fs.readFile(filePath, "utf8");
+    const lines = content.split("\n").slice(0, currentLine);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const parsed = this.parseFunctionCall(line);
+      if (parsed) {
+        const { name, args } = parsed;
+        const lineNum = i + 1;
+
+        variables.push({
+          name: `Function (line ${lineNum})`,
+          value: `${name} ${args.length > 0 ? args.join(" ") : "(no arguments)"}`,
+          variablesReference: 0,
+        });
+
+        args.forEach((arg, index) => {
           variables.push({
-            name: `Function (line ${lineNum})`,
-            value: `${name} ${args}`,
+            name: `  └─ arg${index + 1}`,
+            value: arg,
             variablesReference: 0,
           });
-  
-          if (args !== "(no arguments)") {
-            args.split(/\s+/).forEach((arg, index) => {
-              variables.push({
-                name: `  └─ arg${index + 1}`,
-                value: arg,
-                variablesReference: 0,
-              });
-            });
-          }
-        }
+        });
       }
     }
-  
-    response.body = { variables };
-    this.sendResponse(response);
   }
 
+  response.body = { variables };
+  this.sendResponse(response);
+}
+  
 
   protected async stackTraceRequest(
     response: DebugProtocol.StackTraceResponse,
@@ -250,6 +250,15 @@ private _functions: Map<string, string[]> = new Map(); // functionName → [arg1
       }
       return;
     }
+//
+    const editor = vscode.window.activeTextEditor;
+if (editor && this._currentLine) {
+  const doc = editor.document;
+  const currentLineText = doc.lineAt(this._currentLine - 1).text.trim();
+  this._currentLineContent = currentLineText;
+}
+
+
   
     // First step
     if (this._currentLine === undefined) {
@@ -288,7 +297,91 @@ private _functions: Map<string, string[]> = new Map(); // functionName → [arg1
   }
 
 
+
+  private parseFunctionCall(line: string): { name: string; args: string[] } | null {
+    const trimmed = line.trim();
+  
+    // Ignore comments or type signatures
+    if (!trimmed || trimmed.startsWith("--") || /^\w+\s*::/.test(trimmed)) {
+      return null;
+    }
+  
+    // Match: name [args] = RHS
+    const match = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_']*)\s*(.*?)\s*=\s*(.+)$/);
+    if (!match) return null;
+  
+    const name = match[1];
+    const lhsArgs = match[2]?.trim().split(/\s+/).filter(Boolean) || [];
+    const rhs = match[3].trim();
+  
+    // Now extract arguments from RHS function call
+    const rhsArgsMatch = rhs.match(/^[a-zA-Z_][a-zA-Z0-9_']*\s+(.+)$/);
+    let rhsArgs: string[] = [];
+  
+    if (rhsArgsMatch) {
+      // Split arguments safely on spaces, but keep quoted strings together
+      const argsPart = rhsArgsMatch[1];
+      const argRegex = /"[^"]*"|[^\s]+/g;
+      rhsArgs = [...argsPart.matchAll(argRegex)].map(m => m[0]);
+    }
+  
+    // Use RHS arguments as function call arguments if no LHS ones
+    const finalArgs = lhsArgs.length > 0 ? lhsArgs : rhsArgs;
+  
+    return { name, args: finalArgs };
+  }
+
+  
+
+
 // step in 
+
+protected async stepInRequest(
+  response: DebugProtocol.StepInResponse,
+  args: DebugProtocol.StepInArguments
+): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || !this._currentLine) {
+    this.sendErrorResponse(response, {
+      id: 1005,
+      format: "Cannot step in: no active line or editor.",
+    });
+    return;
+  }
+
+  const doc = editor.document;
+  const currentLineText = doc.lineAt(this._currentLine - 1).text.trim();
+  const calledFunction = this.getCalledFunctionName(currentLineText);
+
+  if (!calledFunction) {
+    this.sendErrorResponse(response, {
+      id: 1006,
+      format: "No function call found on this line to step into.",
+    });
+    return;
+  }
+
+  // Search for the function definition line
+  const content = doc.getText();
+  const lines = content.split("\n");
+
+  const definitionLine = lines.findIndex(line =>
+    line.trim().startsWith(calledFunction + " ")
+  );
+
+  if (definitionLine === -1) {
+    this.sendErrorResponse(response, {
+      id: 1007,
+      format: `Function '${calledFunction}' definition not found.`,
+    });
+    return;
+  }
+
+  this._currentLine = definitionLine + 1; // VSCode line numbers are 0-based
+  this.sendEvent(new StoppedEvent("step", HaskellDebugSession.THREAD_ID));
+  this.sendResponse(response);
+}
+
 
 
   // protected async stepInRequest(

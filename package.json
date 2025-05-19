@@ -9,6 +9,10 @@
   "categories": [
     "Other"
   ],
+  "capabilities": {
+  "supportsStepIn": true
+},
+
   "activationEvents": [
     "onDebugResolve:haskell",
     "onLanguage:haskell"
