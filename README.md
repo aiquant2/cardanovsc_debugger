@@ -5,10 +5,9 @@
 
 ## ✨ Features
 
-**cardanovsc_debugger** is a lightweight yet powerful Visual Studio Code extension tailored for debugging Haskell and Plutus smart contracts. Whether you're developing for the Cardano blockchain or experimenting with Plutus scripts, this extension provides:
+**cardanovsc_debugger (vscode extension)** is a lightweight yet powerful Visual Studio Code extension tailored for debugging Haskell and Plutus smart contracts. Whether you're developing for the Cardano blockchain or experimenting with Plutus scripts, this extension provides:
 
 - 🔍 Seamless debugging support for `.hs` (Haskell) files.
-- 🧠 Launch configuration support for customized debugging.
 - `showIO`: Show standard I/O during debug.
 - 📂 Integrated with VS Code Debug Adapter Protocol.
 - 🚀 Real-time error checking and suggestion 

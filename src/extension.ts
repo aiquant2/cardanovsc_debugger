@@ -5,10 +5,13 @@ import { startGhcidOnHaskellOpen } from './diagnostics';  // Merged file
 import { execFile } from 'child_process';
 import path from 'path';
 import os from 'os';
+import { import_data } from './importData';
 
 
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+ 
+    import_data();
     const platform = os.platform();
     const scriptName = platform === 'win32' ? 'check-ghcid.bat' : 'check-ghcid.sh';
     console.log(context.extensionPath);
