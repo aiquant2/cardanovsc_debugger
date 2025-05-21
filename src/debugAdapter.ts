@@ -1,6 +1,4 @@
-
 import {
-  ContinuedEvent,
   DebugSession,
   InitializedEvent,
   OutputEvent,
@@ -15,11 +13,10 @@ import * as fs from "fs/promises";
 import { diagnosticCollection, parseCabalErrors } from "./diagnostics";
 import path from "path";
 import { Thread } from "@vscode/debugadapter";
-import { importMap } from './config/importMap';
-
-export interface thread extends DebugProtocol.Thread{
-  id:number,
-  name:string
+import { extractHaskellFunctions } from "./utils/extractHaskellFunctions";
+export interface thread extends DebugProtocol.Thread {
+  id: number;
+  name: string;
 }
 export interface HaskellLaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
@@ -34,51 +31,39 @@ export interface HaskellLaunchRequestArguments
 }
 
 export class HaskellDebugSession extends DebugSession {
-public ghciProcess: child_process.ChildProcess | undefined;
-private isFileLoaded = false;
-private loadDebounceTimer: NodeJS.Timeout | undefined;
-private lastLoadedFileContent: string | undefined;
-private launchArgs: HaskellLaunchRequestArguments | undefined;
-private isRestarting = false;
-private static THREAD_ID = 1;
-private datumValue: string = "";
-_flag:boolean =false;
-_currentLine!: number;
-_breakpoints: any;
-_currentFilePath!: string;
-private _currentLineContent: string = "";
-private _stepInFunction: string | null = null;
-private _stepInArgs: string[] | null = null;
-
-
-
-private _callStack: { name: string; args: string[]; line: number }[] = [];
-  workspaceRoot!: string;
-  static launchArgs: any;
+  public ghciProcess: child_process.ChildProcess | undefined;
+  private isFileLoaded = false;
+  private loadDebounceTimer: NodeJS.Timeout | undefined;
+  private lastLoadedFileContent: string | undefined;
+  private launchArgs: HaskellLaunchRequestArguments | undefined;
+  private isRestarting = false;
+  private static THREAD_ID = 1;
+  private datumValue: string = "";
+  _flag: boolean = false;
+  _currentLine!: number;
+  _breakpoints: any;
+  _currentFilePath!: string;
+  private _currentLineContent: string = "";
+  private _argumentMap: Record<string, string> = {};
+  private _callStack: { callerLine: number; callerFunc: string }[] = [];
 
   // variable panel
 
-  protected threadsRequest (
+  protected threadsRequest(
     response: DebugProtocol.ThreadsResponse,
     _request?: DebugProtocol.Request
   ): void {
-    
     response.body = {
-   
-      threads: [
-        new Thread(HaskellDebugSession.THREAD_ID,"main")
-      ]
+      threads: [new Thread(HaskellDebugSession.THREAD_ID, "main")],
     };
 
     this.sendResponse(response);
   }
 
-
   protected scopesRequest(
     response: DebugProtocol.ScopesResponse,
     args: DebugProtocol.ScopesArguments
   ): void {
-
     const scopes: DebugProtocol.Scope[] = [
       {
         name: "File Info",
@@ -91,230 +76,140 @@ private _callStack: { name: string; args: string[]; line: number }[] = [];
     this.sendResponse(response);
   }
 
+  protected async variablesRequest(
+    response: DebugProtocol.VariablesResponse,
+    args: DebugProtocol.VariablesArguments
+  ): Promise<void> {
+    const variables: DebugProtocol.Variable[] = [];
 
+    const filePath = this.launchArgs?.activeFile;
+    const currentLine = this._currentLine;
+    const fileName = path.basename(filePath || "unknown");
+    const dirName = path.dirname(filePath || "unknown");
 
-private _variableStore: Map<string, Map<string, string>> = new Map(); // functionName → { argName → value }
-private _functions: Map<string, string[]> = new Map(); // functionName → [arg1, arg2, ...]
+    variables.push(
+      { name: "File", value: fileName, variablesReference: 0 },
+      { name: "Directory", value: dirName, variablesReference: 0 },
+      {
+        name: "f: myValidator",
+        value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,
+        variablesReference: 0,
+      },
+      {
+        name: "datum",
+        value: this.datumValue || "<not set>",
+        variablesReference: 0,
+        evaluateName: "cborHex",
+      }
+    );
 
-
-// 6 no. 
-
-protected async variablesRequest(
-  response: DebugProtocol.VariablesResponse,
-  args: DebugProtocol.VariablesArguments
-): Promise<void> {
-  const variables: DebugProtocol.Variable[] = [];
-
-  const filePath = this.launchArgs?.activeFile;
-  const currentLine = this._currentLine;
-
-  const fileName = path.basename(filePath || "unknown");
-  const dirName = path.dirname(filePath || "unknown");
-
-  // 📁 Basic File Info
-
-  variables.push(
-    { name: "File", value: fileName, variablesReference: 0 },
-    { name: "Directory", value: dirName, variablesReference: 0 },
-    { name: "f: myValidator", value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`, variablesReference: 0 },
-    { name: "datum", value: this.datumValue || "<not set>", variablesReference: 0, evaluateName: "cborHex" },
-    
-  );
-
-  const moduleName = filePath ? await this.getModuleNameFromFile(filePath) : null;
-  if (moduleName) {
-    variables.push({
-      name: "📄 Module",
-      value: moduleName,
-      variablesReference: 0,
-    });
-  }
-
-  // ▶️ Step-In Function Info (if user stepped into a function)
-  if (this._stepInFunction) {
-    variables.push({
-      name: `▶ Step Into Function`,
-      value: this._stepInFunction,
-      variablesReference: 0,
-    });
-
-    // Show arguments passed to the function
-    (this._stepInArgs || []).forEach((arg, index) => {
+    const moduleName = filePath
+      ? await this.getModuleNameFromFile(filePath)
+      : null;
+    if (moduleName) {
       variables.push({
-        name: `  └─ arg${index + 1}`,
-        value: arg,
+        name: "📄 Module",
+        value: moduleName,
         variablesReference: 0,
       });
-    });
-  }
+    }
 
-  // 🔍 Scan parsed function calls up to current line for display
-  if (filePath && currentLine !== undefined) {
-    const content = await fs.readFile(filePath, "utf8");
-    const lines = content.split("\n").slice(0, currentLine);
+    if (filePath && currentLine !== undefined) {
+      const functions = await extractHaskellFunctions(filePath);
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const parsed = this.parseFunctionCall(line);
-      if (parsed) {
-        const { name, args } = parsed;
-        const lineNum = i + 1;
-
+      for (const func of functions) {
         variables.push({
-          name: `Function (line ${lineNum})`,
-          value: `${name} ${args.length > 0 ? args.join(" ") : "(no arguments)"}`,
+          name: ` ${func.name} `,
+          value: `f: ${func.name} ${func.args.join(" ")} = ${func.body.join(
+            " "
+          )}`,
+          evaluateName: func.name,
           variablesReference: 0,
         });
 
-        args.forEach((arg, index) => {
+        for (const arg of func.args) {
+          const value = this._argumentMap?.[arg] || "not set";
           variables.push({
-            name: `  └─ arg${index + 1}`,
-            value: arg,
+            name: ` ${arg} `,
+            value,
             variablesReference: 0,
           });
-          
-        });
-      }
-    }
-  }
-
-  response.body = { variables };
-  this.sendResponse(response);
-
-}
-
-private async getModuleNameFromFile(filePath: string): Promise<string | null> {
-  try {
-    const content = await fs.readFile(filePath, "utf8");
-    const lines = content.split("\n");
-
-    for (const line of lines) {
-      const match = line.match(/^\s*module\s+([\w.]+)(\s*\(.*\))?\s+where/);
-      if (match) {
-        console.log("✅ Module Found:", match[1]);
-        return match[1]; // e.g., HelloWorld.Compiler
+        }
       }
     }
 
-    console.warn("⚠️ No module declaration found in file:", filePath);
-    return null;
-  } catch (error) {
-    console.error("❌ Failed to read file:", error);
-    return null;
+    response.body = { variables };
+    this.sendResponse(response);
   }
-}
 
+  private async getModuleNameFromFile(
+    filePath: string
+  ): Promise<string | null> {
+    try {
+      const content = await fs.readFile(filePath, "utf8");
+      const lines = content.split("\n");
 
-
-// 4 no. without step in  
-
-// protected async variablesRequest(
-//   response: DebugProtocol.VariablesResponse,
-//   args: DebugProtocol.VariablesArguments
-// ): Promise<void> {
-//   const variables: DebugProtocol.Variable[] = [];
-
-//   const filePath = this.launchArgs?.activeFile;
-//   const currentLine = this._currentLine;
-
-//   const fileName = path.basename(filePath || "unknown");
-//   const dirName = path.dirname(filePath || "unknown");
-
-//   variables.push(
-//     { name: "File", value: fileName, variablesReference: 0 },
-//     { name: "Directory", value: dirName, variablesReference: 0 },
-//     { name: "f: myValidator", value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`, variablesReference: 0 },
-//     { name: "datum", value: this.datumValue || "<not set>", variablesReference: 0, evaluateName: "cborHex" }
-//   );
-
-//   if (filePath && currentLine !== undefined) {
-//     const content = await fs.readFile(filePath, "utf8");
-//     const lines = content.split("\n").slice(0, currentLine);
-
-//     for (let i = 0; i < lines.length; i++) {
-//       const line = lines[i];
-//       const parsed = this.parseFunctionCall(line);
-//       if (parsed) {
-//         const { name, args } = parsed;
-//         const lineNum = i + 1;
-
-//         variables.push({
-//           name: `Function (line ${lineNum})`,
-//           value: `${name} ${args.length > 0 ? args.join(" ") : "(no arguments)"}`,
-//           variablesReference: 0,
-//         });
-
-//         args.forEach((arg, index) => {
-//           variables.push({
-//             name: `  └─ arg${index + 1}`,
-//             value: arg,
-//             variablesReference: 0,
-//           });
-//         });
-//       }
-//     }
-//   }
-
-//   response.body = { variables };
-//   this.sendResponse(response);
-// }
- 
+      for (const line of lines) {
+        const match = line.match(/^\s*module\s+([\w.]+)(\s*\(.*\))?\s+where/);
+        if (match) {
+          console.log("✅ Module Found:", match[1]);
+          return match[1]; // e.g., HelloWorld.Compiler
+        }
+      }
+      console.warn("⚠️ No module declaration found in file:", filePath);
+      return null;
+    } catch (error) {
+      console.error("❌ Failed to read file:", error);
+      return null;
+    }
+  }
 
   protected async stackTraceRequest(
     response: DebugProtocol.StackTraceResponse,
     args: DebugProtocol.StackTraceArguments
   ): Promise<void> {
-    const activeFile = this.launchArgs?.activeFile || "unknown";
-  
-    const stackFrames: DebugProtocol.StackFrame[] = [];
-  
-    if (this._currentLine !== undefined) {
-      stackFrames.push({
+    try {
+      const activeFile =
+        this.launchArgs?.activeFile ||
+        vscode.window.activeTextEditor?.document.fileName ||
+        "unknown";
+
+      const stackFrames: DebugProtocol.StackFrame[] = [];
+
+      if (this._currentLine !== undefined && this._currentLine > 0) {
+        const frame: DebugProtocol.StackFrame = {
+          id: 1,
+          name: "main", // or dynamically resolve function name if available
+          line: this._currentLine,
+          column: 1,
+          source: {
+            name: path.basename(activeFile),
+            path: activeFile,
+          },
+        };
+        stackFrames.push(frame);
+      }
+
+      response.body = {
+        stackFrames,
+        totalFrames: stackFrames.length,
+      };
+
+      this.sendResponse(response);
+    } catch (error) {
+      this.sendErrorResponse(response, {
         id: 1,
-        name: "main",
-        line: this._currentLine,
-        column: 1,
-        source: {
-          name: path.basename(activeFile),
-          path: activeFile,
-        },
+        format: `Failed to build stack trace: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     }
-  
-    response.body = {
-      stackFrames,
-      totalFrames: stackFrames.length,
-    };
-  
-    this.sendResponse(response);
   }
 
-  protected setVariableRequest(
-    response: DebugProtocol.SetVariableResponse,
-    args: DebugProtocol.SetVariableArguments,
-    request?: DebugProtocol.Request
-  ): void {
-    // Extract info from args
-    const { variablesReference, name, value } = args;
-  
-  
-    // You should apply the value update to the backend/debugged program here.
-    // For example, call your internal logic to update the variable value.
-  
-    // Dummy implementation: simply echo the input
-    response.body = {
-      value: value,
-      variablesReference: 0 // 0 means it's not an object with child properties
-    };
-  
-    this.sendResponse(response);
-  }
-  
   protected setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
     args: DebugProtocol.SetBreakpointsArguments
   ): void {
-
     const breakpoints = args.breakpoints?.map((bp) => bp.line) || [];
 
     this._breakpoints = breakpoints; // ✅ Initialize your internal breakpoints list
@@ -337,17 +232,13 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     this.sendResponse(response);
   }
 
-
-// old working
-
   protected async nextRequest(
     response: DebugProtocol.NextResponse,
     args: DebugProtocol.NextArguments
   ): Promise<void> {
-  
     if (!this._breakpoints || this._breakpoints.length === 0) {
       this._flag = true;
-      
+
       this.sendResponse(response);
       if (this.launchArgs) {
         await this.launchRequest(response, this.launchArgs);
@@ -359,395 +250,257 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
       }
       return;
     }
-//
+
     const editor = vscode.window.activeTextEditor;
-if (editor && this._currentLine) {
-  const doc = editor.document;
-  const currentLineText = doc.lineAt(this._currentLine - 1).text.trim();
-  this._currentLineContent = currentLineText;
-}
+    if (editor && this._currentLine) {
+      const doc = editor.document;
+      const currentLineText = doc.lineAt(this._currentLine - 1).text.trim();
+      this._currentLineContent = currentLineText;
+    }
 
-
-  
     // First step
     if (this._currentLine === undefined) {
       this._currentLine = this._breakpoints[0];
-      this.sendEvent(new StoppedEvent("breakpoint", HaskellDebugSession.THREAD_ID));
+      this.sendEvent(
+        new StoppedEvent("breakpoint", HaskellDebugSession.THREAD_ID)
+      );
+      this.sendEvent(
+        new OutputEvent(`breakpoint hit at ${this._currentLine} \n`)
+      );
+
       this.sendResponse(response);
       return;
     }
-  
+
     const currentIdx = this._breakpoints.indexOf(this._currentLine);
-  
+
+    // No more breakpoints — execute end of file
     if (currentIdx === -1 || currentIdx === this._breakpoints.length - 1) {
-      // No more breakpoints — continue execution
-      this._currentLine === undefined;
       this._flag = true;
-  
-      this.sendEvent(new ContinuedEvent(HaskellDebugSession.THREAD_ID));
-      this.sendResponse(response);
-      if (this.launchArgs) {
-        await this.launchRequest(response, this.launchArgs);
+
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const lastLine = editor.document.lineCount;
+        this._currentLine = lastLine;
+
+        const lastLineText = editor.document.lineAt(lastLine - 1).text.trim();
+        this._currentLineContent = lastLineText;
+
+        this.sendEvent(
+          new OutputEvent(
+            `Reached end of program at line ${this._currentLine}\n`
+          )
+        );
+
+        // 🔁 Execute the final line (this is where you'd invoke GHCi, run a command, etc.)
+        if (this.launchArgs) {
+          await this.launchRequest(response, this.launchArgs);
+        } else {
+          this.sendErrorResponse(response, {
+            id: 1004,
+            format:
+              "Cannot restart: No previous launch configuration available",
+          });
+        }
       } else {
-        this.sendErrorResponse(response, {
-          id: 1004,
-          format: "Cannot restart: No previous launch configuration available",
-        });
+        this.sendEvent(
+          new OutputEvent(`Editor not found. Can't set current line.\n`)
+        );
       }
+
+      this.sendResponse(response);
       return;
     }
-  
+
     // Move to next breakpoint
     this._currentLine = this._breakpoints[currentIdx + 1];
     this._flag = false;
-  
+
     this.sendEvent(new StoppedEvent("step", HaskellDebugSession.THREAD_ID));
+    this.sendEvent(new OutputEvent(`breakpoint hit at ${this._currentLine}\n`));
+
     this.sendResponse(response);
   }
 
-
-
-// 1 no. 
-
-  private parseFunctionCall(line: string): { name: string; args: string[] } | null {
-    const trimmed = line.trim();
-  
-    // Ignore comments or type signatures
-    if (!trimmed || trimmed.startsWith("--") || /^\w+\s*::/.test(trimmed)) {
-      return null;
-    }
-  
-    // Match: name [args] = RHS
-    const match = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_']*)\s*(.*?)\s*=\s*(.+)$/);
-    if (!match) return null;
-  
-    const name = match[1];
-    const lhsArgs = match[2]?.trim().split(/\s+/).filter(Boolean) || [];
-    const rhs = match[3].trim();
-  
-    console.log("parse call");
-    
-    // Now extract arguments from RHS function call
-    const rhsArgsMatch = rhs.match(/^[a-zA-Z_][a-zA-Z0-9_']*\s+(.+)$/);
-    let rhsArgs: string[] = [];
-  
-    if (rhsArgsMatch) {
-      // Split arguments safely on spaces, but keep quoted strings together
-      const argsPart = rhsArgsMatch[1];
-      const argRegex = /"[^"]*"|[^\s]+/g;
-      rhsArgs = [...argsPart.matchAll(argRegex)].map(m => m[0]);
-    }
-  
-    // Use RHS arguments as function call arguments if no LHS ones
-    const finalArgs = lhsArgs.length > 0 ? lhsArgs : rhsArgs;
-  
-    return { name, args: finalArgs };
-
-    
-  }
-
-  // 6 no. 
-
-  
-  protected stepInTargetsRequest(
-    response: DebugProtocol.StepInTargetsResponse,
-    args: DebugProtocol.StepInTargetsArguments,
-    request?: DebugProtocol.Request
-  ): void {
-    const filePath = this.launchArgs?.activeFile;
-    const line = this._currentLine;
-  
-    console.log("hii");
-    
-    if (!filePath || line === undefined) {
+  protected async stepOutRequest(
+    response: DebugProtocol.StepOutResponse,
+    args: DebugProtocol.StepOutArguments
+  ): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !this._currentLine) {
       this.sendResponse(response);
       return;
     }
-   console.log(filePath, "filepath");
-   
-    fs.readFile(filePath, "utf8").then((content) => {
-      const lines = content.split("\n");
-      const currentLineText = lines[line];
-  
-      const functions = this.extractFunctionsFromLine(currentLineText);
-  
-      console.log("stepinTargetrequest called");
-      
-      const targets = functions.map((fn, idx) => ({
-        id: idx + 1,
-        label: fn.name,
-        line: line,
-        column: fn.index + 1,
-      }));
-  
-      const importMap = this.extractImportMapFromFile(content);
 
-      console.log("📍 stepInTargetsRequest called");
+    if (!this._callStack || this._callStack.length === 0) {
+      await this.nextRequest(response, args as DebugProtocol.NextArguments);
+      return;
+    }
 
-      console.log(importMap);
-      
-      response.body = { targets };
+    const callerInfo = this._callStack.pop();
+    if (!callerInfo) {
+      await this.nextRequest(response, args as DebugProtocol.NextArguments);
+      return;
+    }
+
+    const { callerLine, callerFunc } = callerInfo;
+
+    this._currentLine = callerLine;
+
+    this.sendEvent(
+      new OutputEvent(
+        `Stepped out to caller at line ${callerLine} (${callerFunc})\n`
+      )
+    );
+    this.sendEvent(new StoppedEvent("step", HaskellDebugSession.THREAD_ID));
+
+    editor.revealRange(
+      new vscode.Range(
+        new vscode.Position(callerLine - 1, 0),
+        new vscode.Position(callerLine - 1, Number.MAX_VALUE)
+      ),
+      vscode.TextEditorRevealType.InCenter
+    );
+
+    this.sendResponse(response);
+  }
+
+  protected async stepInRequest(
+    response: DebugProtocol.StepInResponse,
+    args: DebugProtocol.StepInArguments,
+    request?: DebugProtocol.Request
+  ): Promise<void> {
+    if (this._flag || this._currentLine === undefined) {
       this.sendResponse(response);
-    }).catch(() => this.sendResponse(response));
-    this.sendEvent(new OutputEvent("📍 stepInTargetsRequest triggered\n"));
-
-  }
-
-  // *****
-
-  // private extractImportMapFromFile(content: string): Record<string, string> {
-  //   const map: Record<string, string> = {};
-  //   const regex = /import\s+(\w+)\s+as\s+(\w+)/g;
-  //   let match;
-  
-  //   while ((match = regex.exec(content)) !== null) {
-  //     const [_, modulePath, alias] = match;
-  //     map[alias] = modulePath;
-  //   }
-  
-  //   return map;
-  // }
-
-  // new 
-
-  private extractImportMapFromFile(fileContent: string): Record<string, string> {
-    const importRegex = /^import\s+(qualified\s+)?([\w\.]+)(?:\s+as\s+(\w+))?(?:\s*\((.*?)\))?/gm;
-    const importMap: Record<string, string> = {};
-  
-    let match: RegExpExecArray | null;
-  
-    while ((match = importRegex.exec(fileContent)) !== null) {
-      const [, qualified, modulePath, alias, importedFns] = match;
-      const moduleAlias = alias || (qualified ? modulePath : ""); // If no alias and not qualified, unqualified import
-  
-      if (importedFns) {
-        const functions = importedFns.split(",").map(fn => fn.trim());
-        for (const fn of functions) {
-          importMap[fn] = modulePath;
-        }
-      }
-  
-      if (moduleAlias !== "") {
-        importMap[moduleAlias] = modulePath;
-      } else {
-        importMap[modulePath] = modulePath;
-      }
+      return;
     }
-  
-    return importMap;
-  }
-  
 
-  //
-  private extractFunctionsFromLine(line: string): { name: string; index: number }[] {
-    const matches: { name: string; index: number }[] = [];
-  
-    const cleanedLine = line.replace(/"[^"]*"/g, '""'); // Replace strings
-  
-    const regex = /\b([A-Za-z_][A-Za-z0-9_]*\.[a-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*)\b/g;
-  
-    let match;
-    while ((match = regex.exec(cleanedLine)) !== null) {
-      const name = match[1];
-  
-      const keywords = new Set([
-        "let", "in", "do", "case", "of", "then", "else", "where", "module", "import"
-      ]);
-  
-      if (!keywords.has(name)) {
-        matches.push({ name, index: match.index });
-      }
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      this.sendResponse(response);
+      return;
     }
-  
-    console.log("💡 Extracted functions:", matches);
-    return matches;
-  }
-  
 
-// new new stepin
+    const document = editor.document;
+    const fullLine = document.lineAt(this._currentLine - 1).text;
 
+    const rhs = fullLine.split("=")[1]?.trim();
+    if (!rhs) {
+      await this.nextRequest(response, args as DebugProtocol.NextArguments);
+      return;
+    }
 
+    const words = this.extractWords(rhs);
+    const functions = await extractHaskellFunctions(document.fileName);
 
-protected async stepInRequest(
-  response: DebugProtocol.StepInResponse,
-  args: DebugProtocol.StepInArguments
-): Promise<void> {
-  const filePath = this.launchArgs?.activeFile;
-  const line = this._currentLine;
+    for (const word of words) {
+      const targetFunc = functions.find((f) => f.name === word);
+      if (targetFunc) {
+        const targetLine = this.findFunctionDefinitionLine(document, word);
+        if (targetLine > 0) {
+          
+          this._callStack = this._callStack || []; 
+          this._callStack.push({
+            callerLine: this._currentLine,
+            callerFunc: this.extractFunctionName(fullLine),
+          });
 
-  if (!filePath || line === undefined) {
-    this.sendResponse(response);
-    return;
-  }
+          this._currentLine = targetLine;
 
-  const content = await fs.readFile(filePath, "utf8");
-  const lines = content.split("\n");
+          const callMatch = rhs.match(new RegExp(`${word}\\s+(.*)`));
+          const argValues = callMatch?.[1]?.split(/\s+/) || [];
 
-  if (line < 0 || line >= lines.length) {
-    this.sendEvent(new OutputEvent(`❌ Invalid line number: ${line}\n`));
-    this.sendResponse(response);
-    return;
-  }
+          this._argumentMap = {};
+          for (let i = 0; i < targetFunc.args.length; i++) {
+            const name = targetFunc.args[i];
+            const value = argValues[i] || "<missing>";
+            this._argumentMap[name] = value;
+          }
 
-  const currentLineText =
-    lines[line - 1]?.trim() !== ""
-      ? lines[line - 1]
-      : lines[line]?.trim() !== ""
-      ? lines[line]
-      : lines[line + 1] ?? "";
-
-  console.log("📌 Current line number:", line);
-  console.log("🔍 Raw line content:", JSON.stringify(currentLineText));
-
-  const rhsMatch = currentLineText.split("=").slice(1).join("=").trim();
-
-  if (!rhsMatch) {
-    this.sendEvent(new OutputEvent("❌ No right-hand side expression to evaluate.\n"));
-    this.sendResponse(response);
-    return;
-  }
-
-  const calledFnMatch = rhsMatch.match(/^([a-zA-Z0-9_\.]+)/);
-  const calledFnName = calledFnMatch?.[1];
-
-  if (!calledFnName) {
-    this.sendEvent(new OutputEvent("❌ No function call found on RHS.\n"));
-    this.sendResponse(response);
-    return;
-  }
-
-  console.log("🔧 Called function name:", calledFnName);
-
-  const argsRegex = /\([^\)]*\)|"[^"]*"|[^\s]+/g;
-  const allTokens = rhsMatch.match(argsRegex) || [];
-  const filteredArgs = allTokens.filter(arg => !arg.includes(calledFnName));
-
-  console.log("📦 Function arguments:", filteredArgs);
-
-  const importMap = this.extractImportMapFromFile(content);
-
-  let moduleAlias = "";
-  let functionName = "";
-
-  if (calledFnName.includes(".")) {
-    [moduleAlias, functionName] = calledFnName.split(".");
-  } else {
-    functionName = calledFnName;
-
-    // First, try to find the function in the current file
-    const localFnLine = await this.findLineNumberOfFunction(filePath, functionName);
-    if (localFnLine !== null) {
-      moduleAlias = ""; // means it's local
-    } else {
-      // Check if it's in the import map (used without alias)
-      const foundImport = Object.entries(importMap).find(([alias]) =>
-        content.includes(`${alias}.${functionName}`)
-      );
-
-      if (foundImport) {
-        [moduleAlias] = foundImport;
-      } else {
-        // Fallback to standard library functions
-        const stdLibFallbacks: Record<string, string> = {
-          putStrLn: "Prelude",
-          print: "Prelude",
-          return: "Prelude",
-          show: "Prelude",
-          writeFile: "Prelude",
-          getLine: "Prelude",
-          readFile: "Prelude",
-          createDirectoryIfMissing: "System.Directory",
-        };
-
-        const fallbackModule = stdLibFallbacks[functionName];
-        if (fallbackModule) {
-          moduleAlias = fallbackModule;
-        } else {
+          this.sendEvent(
+            new OutputEvent(`Stepped into ${word} at line ${targetLine}\n`)
+          );
           this.sendEvent(
             new OutputEvent(
-              `❌ Could not resolve module for unqualified function call '${functionName}'.\n` +
-              `Hint: Ensure the function is defined locally or used with a qualified alias.\n`
+              `Captured args: ${JSON.stringify(this._argumentMap)}\n`
             )
           );
+          this.sendEvent(
+            new StoppedEvent("step", HaskellDebugSession.THREAD_ID)
+          );
+
+          editor.revealRange(
+            new vscode.Range(
+              new vscode.Position(targetLine - 1, 0),
+              new vscode.Position(targetLine - 1, Number.MAX_VALUE)
+            ),
+            vscode.TextEditorRevealType.InCenter
+          );
+
           this.sendResponse(response);
           return;
         }
       }
     }
+
+    await this.nextRequest(response, args as DebugProtocol.NextArguments);
   }
 
-  let targetFilePath = filePath;
-
-  if (moduleAlias !== "") {
-    const resolvedModule = importMap[moduleAlias] ?? moduleAlias;
-    targetFilePath = this.resolveFilePathFromModule(resolvedModule);
-
-    if (!targetFilePath) {
-      this.sendEvent(new OutputEvent("❌ Could not resolve file path for module.\n"));
-      this.sendResponse(response);
-      return;
-    }
+  private extractFunctionName(line: string): string {
+    // Extract function name from line like "result = myFunc x y"
+    const match = line.match(/^\s*\w+\s*=\s*(\w+)/);
+    return match?.[1] || "<unknown>";
   }
 
-  const functionLine = await this.findLineNumberOfFunction(targetFilePath, functionName);
+  private extractWords(rhs: string): string[] {
+    const words: string[] = [];
+    let currentWord = "";
+    let inString = false;
+    let inParens = 0;
 
-  console.log("📁 Resolved file path:", targetFilePath);
+    for (const char of rhs) {
+      if (char === '"') {
+        inString = !inString;
+      }
+      if (char === "(" && !inString) {
+        inParens++;
+      }
+      if (char === ")" && !inString) {
+        inParens--;
+      }
 
-  if (functionLine !== null) {
-    this._jumpToFile(targetFilePath, functionLine);
-
-    this.sendEvent(new OutputEvent(
-      `🪜 Stepped into '${functionName}' at ${targetFilePath}:${functionLine + 1}\n`
-    ));
-
-    this._stepInFunction = calledFnName;
-    this._stepInArgs = filteredArgs;
-    this._callStack.push({ name: calledFnName, args: filteredArgs, line });
-  } else {
-    console.log("❌ Function not found in file:", targetFilePath, "for function:", functionName);
-    this.sendEvent(new OutputEvent("❌ Could not locate function definition.\n"));
-  }
-
-  this.sendResponse(response);
-}
-
-
-private _jumpToFile(filePath: string, line: number) {
-  if (!this.launchArgs) {
-    this.launchArgs = {} as HaskellLaunchRequestArguments; // Or your custom type
-  }
-
-  this.launchArgs.activeFile = filePath;
-  this._currentLine = line;
-  // Possibly emit event or update editor state if needed
-}
-
-
- //
-  private resolveFilePathFromModule(modulePath: string): string {
-    console.log("work",this.workspaceRoot);
-    
-    return path.join(this.workspaceRoot, modulePath.replace(/\./g, '/')) + ".hs";
-   
-    
-  }
-  
-  private async findLineNumberOfFunction(filePath: string, functionName: string): Promise<number | null> {
-    const content = await fs.readFile(filePath, "utf8");
-    const lines = content.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-      if (trimmed.startsWith(functionName + " ") || trimmed.startsWith(functionName + "::")) {
-        return i;
+      if (char === " " && !inString && inParens === 0) {
+        if (currentWord) {
+          words.push(currentWord);
+          currentWord = "";
+        }
+      } else {
+        currentWord += char;
       }
     }
-    return null;
+
+    if (currentWord) {
+      words.push(currentWord);
+    }
+    return words.filter((w) => ![".", "=", "->"].includes(w));
   }
-  
-  
-  // end of variable panel
 
+  private findFunctionDefinitionLine(
+    document: vscode.TextDocument,
+    funcName: string
+  ): number {
+    const text = document.getText();
+    const lines = text.split("\n");
 
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // Match either: "funcName =" or "funcName ::"
+      if (line.startsWith(`${funcName} `) || line.startsWith(`${funcName}::`)) {
+        return i + 1; // Convert to 1-based line number
+      }
+    }
+    return 0;
+  }
 
   public constructor() {
     super();
@@ -759,13 +512,15 @@ private _jumpToFile(filePath: string, line: number) {
     response: DebugProtocol.InitializeResponse,
     args: DebugProtocol.InitializeRequestArguments
   ): void {
-    
     response.body = response.body || {};
     response.body.supportsConfigurationDoneRequest = true;
     response.body.supportsEvaluateForHovers = true;
     response.body.supportsFunctionBreakpoints = true;
     response.body.supportsRestartRequest = true;
-    response.body.supportsStepInTargetsRequest= true;
+    (response.body.supportsStepInTargetsRequest = true),
+      (response.body.supportsSetVariable = true);
+    response.body.supportsRestartFrame = true;
+    response.body.supportsSingleThreadExecutionRequests = true;
     this.sendResponse(response);
     this.sendEvent(new InitializedEvent());
   }
@@ -774,25 +529,21 @@ private _jumpToFile(filePath: string, line: number) {
     response: DebugProtocol.LaunchResponse,
     args: HaskellLaunchRequestArguments
   ): Promise<void> {
-    this.launchArgs = args;
-
     try {
       diagnosticCollection.clear();
-   console.log(this._currentLine);
-   
       let x = "";
       let y = "";
-  
+
       // Set launch args
       const editor = vscode.window.activeTextEditor;
       args.activeFile = editor?.document.fileName;
       this.launchArgs = args;
-  
+
       // Check program validity
       const programCommand = args.program?.trim();
       const workspaceFolder =
         args.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  
+
       if (!programCommand || !programCommand.startsWith("cabal repl")) {
         this.sendEvent(
           new OutputEvent(
@@ -803,7 +554,7 @@ private _jumpToFile(filePath: string, line: number) {
         this.sendResponse(response);
         return;
       }
-  
+
       if (!workspaceFolder) {
         this.sendEvent(
           new OutputEvent("No workspace folder found\n", "stderr")
@@ -811,51 +562,56 @@ private _jumpToFile(filePath: string, line: number) {
         this.sendResponse(response);
         return;
       }
-  
+
       // 🔁 Reset critical flags and clean previous state
-    
+
       this.isFileLoaded = false;
       this.isRestarting = false;
-  
+
       // Kill existing GHCi process if any
       if (this.ghciProcess) {
         this.ghciProcess.removeAllListeners();
         this.ghciProcess.kill("SIGKILL");
         this.ghciProcess = undefined;
       }
-  
+
       // Parse the program command
       const [cmd, ...cmdArgs] = programCommand.split(" ");
       this.sendEvent(new OutputEvent("Launching GHCi...\n", "console"));
-  
+
       this._currentFilePath = args.activeFile || "unknown";
-  
+
       // ✅ Breakpoint fallback logic
       if (!this._breakpoints || this._breakpoints.length === 0) {
         this._currentLine = 1;
         this.sendEvent(new StoppedEvent("entry", 1));
+        this.sendEvent(
+          new OutputEvent(`breakpoint hit  at ${this._currentLine} \n`)
+        );
       } else {
         this._currentLine = this._breakpoints[0];
         this.sendEvent(new StoppedEvent("breakpoint", 1));
+        this.sendEvent(
+          new OutputEvent(`breakpoint hit  at ${this._currentLine} \n`)
+        );
       }
-     
-      
-  if(this._currentLine==-1){
-    this._flag=true;
-  }
+
+      if (this._currentLine == -1) {
+        this._flag = true;
+      }
       // Launch GHCi only once per launch
       if (this._flag) {
         this.ghciProcess = child_process.spawn(cmd, cmdArgs, {
           cwd: workspaceFolder,
           shell: true,
         });
-  
+
         this.ghciProcess.stdout?.on("data", (data: Buffer) => {
           const text = data.toString();
-  
+
           x += text;
           this.sendEvent(new OutputEvent(text, "stdout"));
-  
+
           if (
             (text.includes("Prelude>") ||
               text.includes("*Main>") ||
@@ -867,13 +623,13 @@ private _jumpToFile(filePath: string, line: number) {
             }
           }
         });
-  
+
         this.ghciProcess.stderr?.on("data", (data: Buffer) => {
           y += data.toString();
           parseCabalErrors(x + y, y);
           this.sendEvent(new OutputEvent(data.toString(), "stderr"));
         });
-  
+
         this.ghciProcess.on("exit", (code) => {
           if (!this.isRestarting) {
             this.sendEvent(
@@ -882,14 +638,14 @@ private _jumpToFile(filePath: string, line: number) {
             this.sendEvent(new TerminatedEvent());
           }
         });
-  
+
         this._flag = false;
       }
-  
+
       if (args.activeFile) {
         await this.loadHaskellFile(args.activeFile);
       }
-  
+
       this.sendResponse(response);
     } catch (error) {
       this.sendErrorResponse(response, {
@@ -904,7 +660,7 @@ private _jumpToFile(filePath: string, line: number) {
     args: DebugProtocol.RestartArguments
   ): Promise<void> {
     try {
-      this._flag=false;
+      this._flag = false;
       this.isRestarting = true;
       this.sendEvent(new OutputEvent("Restarting debug session...\n"));
 
@@ -1016,9 +772,6 @@ private _jumpToFile(filePath: string, line: number) {
       this.ghciProcess = undefined;
     }
 
-    
-
-
     this.sendEvent(new TerminatedEvent());
     this.sendResponse(response);
   }
@@ -1031,34 +784,3 @@ private _jumpToFile(filePath: string, line: number) {
     this.launchRequest(response, args);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
