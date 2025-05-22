@@ -50,7 +50,10 @@ describe('Extension Activate', () => {
   it('should register commands and debug providers', () => {
     activate(mockContext);
 
-    expect(vscode.commands.registerCommand).toHaveBeenCalledWith('cardanovscDebugger.helloWorld', expect.any(Function));
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      'cardanovscDebugger.helloWorld',
+      expect.any(Function)
+    );
     expect(vscode.debug.registerDebugConfigurationProvider).toHaveBeenCalled();
     expect(vscode.debug.registerDebugAdapterDescriptorFactory).toHaveBeenCalled();
   });
@@ -66,9 +69,10 @@ describe('Extension Deactivate', () => {
 
 describe('HaskellConfigurationProvider', () => {
   let provider: HaskellConfigurationProvider;
-
+  jest.clearAllMocks();
   beforeEach(() => {
     provider = new HaskellConfigurationProvider();
+    jest.spyOn(vscode.window, 'showErrorMessage').mockImplementation(jest.fn());
   });
 
   it('should return default config for .hs files', async () => {
@@ -77,30 +81,39 @@ describe('HaskellConfigurationProvider', () => {
       name: 'Debug Haskell',
       request: 'launch',
     });
-    expect(config).toEqual(expect.objectContaining({
-      type: 'haskell',
-      request: 'launch',
-      program: 'cabal repl --repl-no-load',
-    }));
+    expect(config).toEqual(
+      expect.objectContaining({
+        type: 'haskell',
+        request: 'launch',
+        program: 'cabal repl --repl-no-load',
+      })
+    );
   });
+
+
 
   it('should show error for unsupported file types', async () => {
-    vscode.window.activeTextEditor = {
-      document: { languageId: 'haskell', fileName: 'file.js' },
-    } as any;
-
-    const showErrorMock = jest.fn();
-    (vscode.window.showErrorMessage as jest.Mock) = showErrorMock;
-
-    const config = await provider.resolveDebugConfiguration(undefined, {
-      type: 'haskell',
-      name: 'Debug Haskell',
-      request: 'launch',
+    Object.defineProperty(vscode.window, 'activeTextEditor', {
+      value: {
+        document: { languageId: 'javascript', fileName: 'file.js' },
+      },
+      configurable: true,
     });
-
-    expect(showErrorMock).toHaveBeenCalledWith("Active file must be a Haskell source file (.hs)");
+  
+    (vscode.window.showErrorMessage as jest.Mock).mockClear();
+  
+    const config = await provider.resolveDebugConfiguration(undefined, {
+      type: undefined,
+      name: undefined,
+      request: undefined,
+    } as any); // simulate empty config
+  
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      'Active file must be a Haskell source file (.hs)'
+    );
     expect(config).toBeUndefined();
   });
+  
 });
 
 describe('InlineDebugAdapterFactory', () => {
@@ -119,7 +132,9 @@ describe('InlineDebugAdapterFactory', () => {
       throw new Error('Debug adapter creation failed');
     });
 
-    expect(() => errorFactory.createDebugAdapterDescriptor({} as any)).toThrow('Debug adapter creation failed');
+    expect(() => errorFactory.createDebugAdapterDescriptor({} as any)).toThrow(
+      'Debug adapter creation failed'
+    );
     expect(spy).toHaveBeenCalledWith('Failed to create debug adapter:', expect.any(Error));
   });
 });

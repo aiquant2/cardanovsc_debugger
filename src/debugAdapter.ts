@@ -908,7 +908,7 @@ private _utxosVarRef = 1000; // some unique ID
         );
       }
 
-      if (this._currentLine == -1) {
+      if (this._currentLine === -1) {
         this._flag = true;
       }
       // Launch GHCi only once per launch

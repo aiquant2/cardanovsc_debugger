@@ -78,6 +78,10 @@
         "command": "extension.extractHaskellFunctions",
         "title": "extract function",
         "category": "test"
+      },
+      {
+        "command": "cardanovscDebugger.getUtxoDetails",
+        "title": "Get UTXO Details"
       }
     ]
   },

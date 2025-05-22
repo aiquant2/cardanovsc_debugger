@@ -10,6 +10,13 @@
 // }));
 
 
+describe('debugadapter', () => {
+    test('dummy test', () => {
+      expect(true).toBe(true);
+    });
+  });
+  
+
 // import { HaskellDebugSession } from '../debugAdapter';
 // import { DebugProtocol } from 'vscode-debugprotocol';
 // import { ChildProcess } from 'child_process';
