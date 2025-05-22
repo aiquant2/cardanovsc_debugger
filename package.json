@@ -27,8 +27,8 @@
     "Debuggers"
   ],
   "extensionDependencies": [
-		"AIQUANT-TECHNOLOGIES.cardanovsc"
-	],
+    "AIQUANT-TECHNOLOGIES.cardanovsc"
+  ],
   "activationEvents": [
     "onDebugResolve:haskell",
     "onLanguage:haskell"
@@ -65,41 +65,42 @@
           "haskell"
         ],
         "configurationAttributes": {
-         "launch": {
-  "required": [
-    "program"
-  ],
-  "properties": {
-    "type": {
-      "type": "string",
-      "enum": ["haskell"]
-    },
-    "request": {
-      "type": "string",
-      "enum": ["launch"]
-    },
-    "program": {
-      "type": "string",
-      "description": "Path to the Haskell program to debug"
-    },
-    
-    "showIO": {
-      "type": "boolean",
-      "default": true,
-      "description": "Display I/O output from the program"
-    },
-    "cwd": {
-      "type": "string",
-      "description": "Working directory for the debuggee"
-    },
-    
-    "activeFile": {
-      "type": "string",
-      "description": "Path to the active file being debugged"
-    }
-  }
-}
-
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "haskell"
+                ]
+              },
+              "request": {
+                "type": "string",
+                "enum": [
+                  "launch"
+                ]
+              },
+              "program": {
+                "type": "string",
+                "description": "Path to the Haskell program to debug"
+              },
+              "showIO": {
+                "type": "boolean",
+                "default": true,
+                "description": "Display I/O output from the program"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the debuggee"
+              },
+              "activeFile": {
+                "type": "string",
+                "description": "Path to the active file being debugged"
+              }
+            }
+          }
         },
         "initialConfigurations": [
           {
@@ -125,8 +126,7 @@
               "showIO": true,
               "cwd": "${workspaceFolder}"
             }
-          }        
-
+          }
         ]
       }
     ],
@@ -134,11 +134,14 @@
       {
         "command": "cardanovscDebugger.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "cardanovscDebugger.getUtxoDetails",
+        "title": "Get UTXO Details"
       }
+ 
     ]
   },
-
-
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
@@ -164,6 +167,7 @@
     "@vscode/debugadapter": "^1.68.0",
     "@vscode/debugprotocol": "^1.68.0",
     "await-notify": "^1.0.1",
+    "axios": "^1.9.0",
     "chai": "^5.2.0",
     "lodash": "^4.17.21",
     "rxjs": "^7.8.2",

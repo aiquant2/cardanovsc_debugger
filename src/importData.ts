@@ -1,6 +1,16 @@
-import * as vscode from "vscode";
 
-export const import_data = async () => {
+import * as vscode from "vscode";
+import { utxoCmd } from "./utils/webview";
+
+// Define the expected return type (adjust based on actual shape if needed)
+interface NetworkConfig {
+  network: string;
+  apiKey: string;
+  [key: string]: any;
+}
+
+
+export const import_data = async ( context:vscode.ExtensionContext) => {
   try {
     const ext = vscode.extensions.getExtension("AIQUANT-TECHNOLOGIES.cardanovsc");
 
@@ -12,23 +22,21 @@ export const import_data = async () => {
     const api = ext.isActive ? ext.exports : await ext.activate();
 
     if (!api) {
-      vscode.window.showErrorMessage("Cardanovsc extension not ready. Please activate it and try again.");
+      vscode.window.showErrorMessage("Cardanovsc extension not ready.");
       return;
     }
 
-    const config = api.getFirstNetworkConfig();
+    const config: NetworkConfig = await api.getFirstNetworkConfig();
+
     if (!config) {
-      vscode.window.showErrorMessage("No Cardano network config found. Please connect via the 'cardanovsc' extension.");
+      vscode.window.showErrorMessage("No Cardano network config found.");
       return;
-    }
-
-    const lucid = await api.initializeLucid(config.network, config.apiKey);
-    if (lucid) {
-      vscode.window.showInformationMessage("Lucid initialized successfully.");
-    }
-
+    }else{  
+      utxoCmd(config.apiKey,config.network,context);
+}
+    
   } catch (error: any) {
-    console.error("Error initializing Lucid:", error);
-    vscode.window.showErrorMessage(`Failed to initialize Lucid: ${error.message || error}`);
+    console.error("Error retrieving config:", error);
+    vscode.window.showErrorMessage(`Failed to retrieve Cardano config: ${error.message || error}`);
   }
 };
