@@ -123,3 +123,4 @@ describe('InlineDebugAdapterFactory', () => {
     expect(spy).toHaveBeenCalledWith('Failed to create debug adapter:', expect.any(Error));
   });
 });
+
