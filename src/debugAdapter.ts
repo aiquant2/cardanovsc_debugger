@@ -741,10 +741,7 @@ import { diagnosticCollection, parseCabalErrors } from "./diagnostics";
 import path from "path";
 import { Thread } from "@vscode/debugadapter";
 import { extractHaskellFunctions } from "./utils/extractHaskellFunctions";
-export interface thread extends DebugProtocol.Thread {
-  id: number;
-  name: string;
-}
+
 export interface HaskellLaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
   program?: string;
@@ -772,7 +769,7 @@ export class HaskellDebugSession extends DebugSession {
   _currentFilePath!: string;
   private _currentLineContent: string = "";
   private _argumentMap: Record<string, string> = {};
-
+private _callStack: { callerLine: number; callerFunc: string }[] = [];
   // variable panel
 
   protected threadsRequest(
@@ -815,20 +812,10 @@ export class HaskellDebugSession extends DebugSession {
 
     variables.push(
       { name: "File", value: fileName, variablesReference: 0 },
-      { name: "Directory", value: dirName, variablesReference: 0 },
-      {
-        name: "f: myValidator",
-        value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,
-        variablesReference: 0,
-      },
-      {
-        name: "datum",
-        value: this.datumValue || "<not set>",
-        variablesReference: 0,
-        evaluateName: "cborHex",
-      });
-
+      { name: "Directory", value: dirName, variablesReference: 0 },      
+      );
       const moduleName = filePath ? await this.getModuleNameFromFile(filePath) : null;
+
     if (moduleName) {
       variables.push({
         name: "📄 Module",
@@ -1071,13 +1058,21 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     }
 
     const words = this.extractWords(rhs);
+    
     const functions = await extractHaskellFunctions(document.fileName);
 
     for (const word of words) {
       const targetFunc = functions.find((f) => f.name === word);
       if (targetFunc) {
         const targetLine = this.findFunctionDefinitionLine(document, word);
+        console.log(targetLine,targetFunc);
+        
         if (targetLine > 0) {
+          this._callStack = this._callStack || [];
+          this._callStack.push({
+            callerLine: this._currentLine,
+            callerFunc: this.extractFunctionName(fullLine),
+          });
           this._currentLine = targetLine;
 
           // ✅ Extract argument values from the call expression
@@ -1120,55 +1115,65 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     await this.nextRequest(response, args as DebugProtocol.NextArguments);
   }
 
-  private extractWords(rhs: string): string[] {
-    const words: string[] = [];
-    let currentWord = "";
-    let inString = false;
-    let inParens = 0;
-
-    for (const char of rhs) {
-      if (char === '"') {
-        inString = !inString;
-      }
-      if (char === "(" && !inString) {
-        inParens++;
-      }
-      if (char === ")" && !inString) {
-        inParens--;
-      }
-
-      if (char === " " && !inString && inParens === 0) {
-        if (currentWord) {
-          words.push(currentWord);
-          currentWord = "";
-        }
-      } else {
-        currentWord += char;
-      }
-    }
-
-    if (currentWord) {
-      words.push(currentWord);
-    }
-    return words.filter((w) => ![".", "=", "->"].includes(w));
+ 
+private extractWords(rhs: string): string[] {
+  // Extract content inside [|| ... ||] if present
+  const match = rhs.match(/\[\|\|(.+?)\|\|\]/);
+  if (match) {
+    rhs = match[1].trim(); // Replace rhs with the quoted content
   }
 
-  private findFunctionDefinitionLine(
-    document: vscode.TextDocument,
-    funcName: string
-  ): number {
-    const text = document.getText();
-    const lines = text.split("\n");
+  const words: string[] = [];
+  let currentWord = "";
+  let inString = false;
+  let inParens = 0;
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      // Match either: "funcName =" or "funcName ::"
-      if (line.startsWith(`${funcName} `) || line.startsWith(`${funcName}::`)) {
-        return i + 1; // Convert to 1-based line number
-      }
+  for (const char of rhs) {
+    if (char === '"') {
+      inString = !inString;
     }
-    return 0;
+    if (char === "(" && !inString) {
+      inParens++;
+    }
+    if (char === ")" && !inString) {
+      inParens--;
+    }
+
+    if (char === " " && !inString && inParens === 0) {
+      if (currentWord) {
+        words.push(currentWord);
+        currentWord = "";
+      }
+    } else {
+      currentWord += char;
+    }
   }
+
+  if (currentWord) {
+    words.push(currentWord);
+  }
+
+  return words.filter((w) => ![".", "=", "->"].includes(w));
+}
+
+
+private findFunctionDefinitionLine(
+  document: vscode.TextDocument,
+  funcName: string
+): number {
+  const text = document.getText();
+  const lines = text.split("\n");
+
+  const regex = new RegExp(`^\\s*${funcName}\\b.*=`);
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (regex.test(lines[i])) {
+      return i + 1; // 1-based line number
+    }
+  }
+
+  return 0;
+}
 
   public constructor() {
     super();
@@ -1182,7 +1187,6 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
   ): void {
     response.body = response.body || {};
     response.body.supportsConfigurationDoneRequest = true;
-    response.body.supportsEvaluateForHovers = true;
     response.body.supportsFunctionBreakpoints = true;
     response.body.supportsRestartRequest = true;
     (response.body.supportsStepInTargetsRequest = true),
@@ -1443,12 +1447,60 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     this.sendEvent(new TerminatedEvent());
     this.sendResponse(response);
   }
-
+   
+  protected async stepOutRequest(
+    response: DebugProtocol.StepOutResponse,
+    args: DebugProtocol.StepOutArguments
+  ): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !this._currentLine) {
+      this.sendResponse(response);
+      return;
+    }
+ 
+    if (!this._callStack || this._callStack.length === 0) {
+      await this.nextRequest(response, args as DebugProtocol.NextArguments);
+      return;
+    }
+ 
+    const callerInfo = this._callStack.pop();
+    if (!callerInfo) {
+      await this.nextRequest(response, args as DebugProtocol.NextArguments);
+      return;
+    }
+ 
+    const { callerLine, callerFunc } = callerInfo;
+ 
+    this._currentLine = callerLine;
+ 
+    this.sendEvent(
+      new OutputEvent(
+        `Stepped out to caller at line ${callerLine} (${callerFunc})\n`
+      )
+    );
+    this.sendEvent(new StoppedEvent("step", HaskellDebugSession.THREAD_ID));
+ 
+    editor.revealRange(
+      new vscode.Range(
+        new vscode.Position(callerLine - 1, 0),
+        new vscode.Position(callerLine - 1, Number.MAX_VALUE)
+      ),
+      vscode.TextEditorRevealType.InCenter
+    );
+ 
+    this.sendResponse(response);
+  }
+ 
   protected attachRequest(
     response: DebugProtocol.AttachResponse,
     args: DebugProtocol.AttachRequestArguments,
     request?: DebugProtocol.Request
   ): void {
     this.launchRequest(response, args);
+  }
+    private extractFunctionName(line: string): string {
+    // Extract function name from line like "result = myFunc x y"
+    const match = line.match(/^\s*\w+\s*=\s*(\w+)/);
+    return match?.[1] || "<unknown>";
   }
 }
