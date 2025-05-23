@@ -15,7 +15,6 @@ import { diagnosticCollection, parseCabalErrors } from "./diagnostics";
 import path from "path";
 import { Thread } from "@vscode/debugadapter";
 import { extractHaskellFunctions } from "./utils/extractHaskellFunctions";
-import axios from "axios";
 export interface thread extends DebugProtocol.Thread {
   id: number;
   name: string;
