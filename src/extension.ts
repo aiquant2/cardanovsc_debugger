@@ -68,7 +68,7 @@ export function deactivate() {
     console.log('Haskell Debugger extension deactivated');
 }
 
-class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+export class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     createDebugAdapterDescriptor(
         session: vscode.DebugSession
     ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
@@ -83,7 +83,7 @@ class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory 
     }
 }
 
-class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider {
+export class HaskellConfigurationProvider implements vscode.DebugConfigurationProvider {
     resolveDebugConfiguration(
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
