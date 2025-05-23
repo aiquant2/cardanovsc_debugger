@@ -1,13 +1,13 @@
 import axios from "axios";
-import * as vscode from 'vscode';
-
+import * as vscode from "vscode";
+import { import_data, NetworkConfig } from "../importData";
 
 export function getLoadingHtml(address: string): string {
-    return wrapHtml(`<p>🔍 Fetching UTXOs for <code>${address}</code>...</p>`);
-  }
-  
-  export function wrapHtml(innerHtml: string): string {
-    return `
+  return wrapHtml(`<p>🔍 Fetching UTXOs for <code>${address}</code>...</p>`);
+}
+
+export function wrapHtml(innerHtml: string): string {
+  return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -64,90 +64,155 @@ export function getLoadingHtml(address: string): string {
       </body>
       </html>
     `;
-  }
-  
-  export function buildUtxoHtml(utxo: any, datumHtml: string): string {
-    const amounts = utxo.amount
-      .map((a: any) => `${a.quantity} ${a.unit}`)
-      .join("<br/>");
-  
-    return wrapHtml(`
+}
+
+export function buildUtxoHtml(utxo: any, datumHtml: string): string {
+  const amounts = utxo.amount
+    .map((a: any) => `${a.quantity} ${a.unit}`)
+    .join("<br/>");
+
+  return wrapHtml(`
       <h2>📦 Latest UTXO</h2>
       <p><strong>Tx Hash:</strong> <code class="highlight">${utxo.tx_hash}</code></p>
       <p><strong>Tx Index:</strong> ${utxo.output_index}</p>
       <p><strong>Amount:</strong><br/> ${amounts}</p>
       ${datumHtml}
     `);
-  }
- export  const utxoCmd =(BLOCKFROST_API_KEY:string, NETWORK:string,context:vscode.ExtensionContext)=>{
-    console.log(BLOCKFROST_API_KEY,NETWORK);
-    
-   
-       context.subscriptions.push( vscode.commands.registerCommand(
-         "cardanovscDebugger.getUtxoDetails",
-         async () => {
-           const inputAddress = await vscode.window.showInputBox({
-             prompt: "Enter the Cardano script address",
-             placeHolder: "addr1...",
-             ignoreFocusOut: true,
-           });
-      
-           const scriptAddress = inputAddress?.trim();
-      
-           if (!scriptAddress) {
-             vscode.window.showErrorMessage("Script address is required.");
-             return;
-           }
-      
-           const panel = vscode.window.createWebviewPanel(
-             "cardanoUtxoInfo",
-             "Cardano UTXO Info",
-             vscode.ViewColumn.One,
-             { enableScripts: true }
-           );
-      
-           panel.webview.html = getLoadingHtml(scriptAddress);
-      
-           try {
-             const utxoRes = await axios.get(
-               `https://cardano-${NETWORK}.blockfrost.io/api/v0/addresses/${scriptAddress}/utxos`,
-               {
-                 headers: { project_id: BLOCKFROST_API_KEY },
-               }
-             );
-      
-             const utxos = utxoRes.data;
-             if (!utxos || utxos.length === 0) {
-               panel.webview.html = wrapHtml(`<p>No UTXOs found at this address.</p>`);
-               return;
-             }
-      
-             const latestUtxo = utxos[utxos.length - 1];
-      
-             let datumHtml = "";
-             if (latestUtxo.data_hash) {
-               try {
-                 const datumRes = await axios.get(
-                   `https://cardano-${NETWORK}.blockfrost.io/api/v0/scripts/datum/${latestUtxo.data_hash}`,
-                   { headers: { project_id: BLOCKFROST_API_KEY } }
-                 );
-      
-                 datumHtml = `
-                   <h3>Datum Hash</h3><code class="highlight">${latestUtxo.data_hash}</code>
-                   <h3>Datum Value</h3><pre>${JSON.stringify(datumRes.data, null, 2)}</pre>`;
-               } catch {
-                 datumHtml = `<p>❌ Failed to fetch datum for hash <code class="highlight">${latestUtxo.data_hash}</code></p>`;
-               }
-             } else if (latestUtxo.inline_datum) {
-               datumHtml = `<h3>Inline Datum</h3><code>${latestUtxo.inline_datum}</code>`;
-             }
-      
-             panel.webview.html = buildUtxoHtml(latestUtxo, datumHtml);
-           } catch (err: any) {
-             panel.webview.html = wrapHtml(
-               `<p style="color:red;">❌ Error: ${err.message || err}</p>`
-             );
-           }
-         }
-       ));
-    };
+}
+
+export const config_disposal = (context: vscode.ExtensionContext) => {
+  const d1 = vscode.commands.registerCommand(
+    "cardanovscDebugger.getUtxoDetails",
+    async () => {
+      let config: NetworkConfig | undefined = await import_data(context);
+      if (!config) {
+        vscode.window.showErrorMessage(
+          "No config.network configuration found. Please configure your config.network first through cardanovsc extension."
+        );
+      } else {
+        const inputAddress = await vscode.window.showInputBox({
+          prompt: "Enter the Cardano script address",
+          placeHolder: "addr1...",
+          ignoreFocusOut: true,
+        });
+
+        const scriptAddress = inputAddress?.trim();
+
+        if (!scriptAddress) {
+          vscode.window.showErrorMessage("Script address is required.");
+          return;
+        }
+
+        const panel = vscode.window.createWebviewPanel(
+          "cardanoUtxoInfo",
+          "Cardano UTXO Info",
+          vscode.ViewColumn.One,
+          { enableScripts: true }
+        );
+
+        panel.webview.html = getLoadingHtml(scriptAddress);
+
+        try {
+          const utxoRes = await axios.get(
+            `https://cardano-${config.config.network}.blockfrost.io/api/v0/addresses/${scriptAddress}/utxos`,
+            {
+              headers: { project_id: config.apiKey },
+            }
+          );
+
+          const utxos = utxoRes.data;
+          if (!utxos || utxos.length === 0) {
+            panel.webview.html = wrapHtml(
+              `<p>No UTXOs found at this address.</p>`
+            );
+            return;
+          }
+
+          const latestUtxo = utxos[utxos.length - 1];
+
+          let datumHtml = "";
+          if (latestUtxo.data_hash) {
+            try {
+              const datumRes = await axios.get(
+                `https://cardano-${config.network}.blockfrost.io/api/v0/scripts/datum/${latestUtxo.data_hash}`,
+                { headers: { project_id: config.apiKey } }
+              );
+
+              datumHtml = `
+                   <h3>Datum Hash</h3><code class="highlight">${
+                     latestUtxo.data_hash
+                   }</code>
+                   <h3>Datum Value</h3><pre>${JSON.stringify(
+                     datumRes.data,
+                     null,
+                     2
+                   )}</pre>`;
+            } catch {
+              datumHtml = `<p>❌ Failed to fetch datum for hash <code class="highlight">${latestUtxo.data_hash}</code></p>`;
+            }
+          } else if (latestUtxo.inline_datum) {
+            datumHtml = `<h3>Inline Datum</h3><code>${latestUtxo.inline_datum}</code>`;
+          }
+
+          panel.webview.html = buildUtxoHtml(latestUtxo, datumHtml);
+        } catch (err: any) {
+          panel.webview.html = wrapHtml(
+            `<p style="color:red;">❌ Error: ${err.message || err}</p>`
+          );
+        }
+
+        panel.webview.html = getLoadingHtml(scriptAddress);
+
+        try {
+          const utxoRes = await axios.get(
+            `https://cardano-${config.network}.blockfrost.io/api/v0/addresses/${scriptAddress}/utxos`,
+            {
+              headers: { project_id: config.apiKey },
+            }
+          );
+
+          const utxos = utxoRes.data;
+          if (!utxos || utxos.length === 0) {
+            panel.webview.html = wrapHtml(
+              `<p>No UTXOs found at this address.</p>`
+            );
+            return;
+          }
+
+          const latestUtxo = utxos[utxos.length - 1];
+
+          let datumHtml = "";
+          if (latestUtxo.data_hash) {
+            try {
+              const datumRes = await axios.get(
+                `https://cardano-${config.network}.blockfrost.io/api/v0/scripts/datum/${latestUtxo.data_hash}`,
+                { headers: { project_id: config.apiKey } }
+              );
+
+              datumHtml = `
+                        <h3>Datum Hash</h3><code class="highlight">${
+                          latestUtxo.data_hash
+                        }</code>
+                        <h3>Datum Value</h3><pre>${JSON.stringify(
+                          datumRes.data,
+                          null,
+                          2
+                        )}</pre>`;
+            } catch {
+              datumHtml = `<p>❌ Failed to fetch datum for hash <code class="highlight">${latestUtxo.data_hash}</code></p>`;
+            }
+          } else if (latestUtxo.inline_datum) {
+            datumHtml = `<h3>Inline Datum</h3><code>${latestUtxo.inline_datum}</code>`;
+          }
+
+          panel.webview.html = buildUtxoHtml(latestUtxo, datumHtml);
+        } catch (err: any) {
+          panel.webview.html = wrapHtml(
+            `<p style="color:red;">❌ Error: ${err.message || err}</p>`
+          );
+        }
+      }
+    }
+  );
+  context.subscriptions.push(d1);
+};
