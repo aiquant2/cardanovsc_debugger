@@ -1,16 +1,16 @@
 # ⚡ cardanovsc_debugger 🚀  
-[![Version](https://vsmarketplacebadges.dev/version/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)  
-[![Downloads](https://vsmarketplacebadges.dev/downloads/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)  
-[![Installs](https://vsmarketplacebadges.dev/installs/AIQUANT-TECHNOLOGIES.cardanovsc_debugger.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc_debugger)
+[![Version](https://vsmarketplacebadges.dev/version/AIQUANT-TECHNOLOGIES.cardanovsc.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc)  [![Downloads](https://vsmarketplacebadges.dev/downloads/AIQUANT-TECHNOLOGIES.cardanovsc.svg)]([https://marketplace.visualstudio.com/items?itemName=juanblanco.solidity](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc)) [![Installs](https://vsmarketplacebadges.dev/installs/AIQUANT-TECHNOLOGIES.cardanovsc.svg)](https://marketplace.visualstudio.com/items?itemName=AIQUANT-TECHNOLOGIES.cardanovsc)
+
 
 ## ✨ Features
 
 **cardanovsc_debugger (vscode extension)** is a lightweight yet powerful Visual Studio Code extension tailored for debugging Haskell and Plutus smart contracts. Whether you're developing for the Cardano blockchain or experimenting with Plutus scripts, this extension provides:
 
 - 🔍 Seamless debugging support for `.hs` (Haskell) files.
-- `showIO`: Show standard I/O during debug.
+- showing `module_name `, `file_name` , `argument value` , functions in debug variable section .
 - 📂 Integrated with VS Code Debug Adapter Protocol.
 - 🚀 Real-time error checking and suggestion 
+- and also register command to get latest utxo of script after locking transaction. that is `get_latest_utxo`
 
 
 Perfect for developers working with Cardano’s Plutus smart contracts, CardanoVSC Debugger brings precision debugging right inside VS Code.
@@ -38,9 +38,14 @@ OR, you can also do like this :
 
 1. Go to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/vscode).
 2. Click **Install** or use the **Extensions** view in VS Code (`Ctrl+Shift+X`) and search for `cardanovsc_debugger`.
-3. Once installed, the extension will activate automatically when you open `.hs` files.
+3. Upon installation, a notification will prompt you to install the cardanovsc extension as it is a required dependency for cardanovsc_debugger.
+4. Once installed, the extension will activate automatically when you open `.hs` files in vscode.
 
 
+
+
+
+Upon installation, a notification will prompt you to install the cardanovsc extension as it is a required dependency for cardanovsc_debugger.
 
 ## 🏗️ Development
 
@@ -60,23 +65,24 @@ npm run test
         └── launch.json
         └── settings.json
         └── tasks.json
-    └── 📁dist-newstyle
-        └── 📁cache
-            └── compiler
+    └── 📁media
+    └── 📁scripts
     └── 📁src
-        └── cardanovscDebugAdapter.ts
+        └── debugAdapter.ts
         └── diagnostics.ts
         └── extension.ts
+        └── importData.ts
+        └── 📁utils
+            └── extractHaskellFunctions.ts
+            └── webview.ts
         └── 📁test
             └── extension.test.ts
             └── diagnostics.test.ts
-            └── cardanovscDebugAdapter.test.ts
+            └── debugAdapter.test.ts
     └── .gitignore
     └── .vscode-test.mjs
     └── .vscodeignore
     └── CHANGELOG.md
-    └── diagnostic.js
-    └── diagnostic.js.map
     └── eslint.config.mjs
     └── package-lock.json
     └── package.json
