@@ -1,4 +1,3 @@
-
 import * as vscode from "vscode";
 import { HaskellDebugSession } from "./debugAdapter";
 import { startGhcidOnHaskellOpen } from "./diagnostics";

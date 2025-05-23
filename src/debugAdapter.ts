@@ -1,3 +1,4 @@
+ 
 import {
   DebugSession,
   InitializedEvent,
@@ -46,36 +47,11 @@ export class HaskellDebugSession extends DebugSession {
   _currentFilePath!: string;
 
 
-  
-  private _utxos: any[] = [];
-private _utxosVarRef = 1000; // some unique ID
-
   private _currentLineContent: string = "";
   private _argumentMap: Record<string, string> = {};
   private _callStack: { callerLine: number; callerFunc: string }[] = [];
  
 
-  private _scriptUtxos: any[] = [];
-  scriptAddress!: string;
-
-  private async loadScriptUtxos(scriptAddress: string): Promise<any[]> {
-    try {
-      const apiKey = "preprodyTn8tbXVaM3yr5LRyM5RDwhuopT06lAD";
-      const network = "https://cardano-preprod.blockfrost.io/api/v0"; // Change if mainnet or preprod
-  
-      const res = await axios.get(`${network}/addresses/${scriptAddress}/utxos`, {
-        headers: {
-          project_id: apiKey,
-        },
-      });
-      console.log("ggg");
-      
-      return res.data; // This will be an array of UTXOs
-    } catch (error) {
-      this.sendEvent(new OutputEvent(`❌ Failed to fetch UTXOs: ${error}\n`));
-      return [];
-    }
-  }
 
   // variable panel
 
@@ -90,26 +66,6 @@ private _utxosVarRef = 1000; // some unique ID
     this.sendResponse(response);
   }
 
-
-  
-  // protected scopesRequest(
-  //   response: DebugProtocol.ScopesResponse,
-  //   args: DebugProtocol.ScopesArguments
-  // ): void {
-  //   const scopes: DebugProtocol.Scope[] = [
-  //     {
-  //       name: "File Info",
-  //       variablesReference: 1000, // Arbitrary reference ID
-  //       expensive: false,
-  //     },
-  //   ];
-
-  //   response.body = { scopes };
-  //   this.sendResponse(response);
-  // }
-
-  // new scope
-
   protected scopesRequest(
     response: DebugProtocol.ScopesResponse,
     args: DebugProtocol.ScopesArguments
@@ -122,88 +78,12 @@ private _utxosVarRef = 1000; // some unique ID
       },
     ];
   
-    // 🔹 Add "Script UTXOs" scope if available
-    if (this._scriptUtxos && this._scriptUtxos.length> 0) {
-      scopes.push({
-        name: "Script UTXOs",
-        variablesReference: 2000, // Arbitrary reference ID for UTXOs
-        expensive: false,
-      });
-    }
   
     response.body = { scopes };
     this.sendResponse(response);
   }
 
   
-
-  // protected async variablesRequest(
-  //   response: DebugProtocol.VariablesResponse,
-  //   args: DebugProtocol.VariablesArguments
-  // ): Promise<void> {
-  //   const variables: DebugProtocol.Variable[] = [];
-
-  //   const filePath = this.launchArgs?.activeFile;
-  //   const currentLine = this._currentLine;
-  //   const fileName = path.basename(filePath || "unknown");
-  //   const dirName = path.dirname(filePath || "unknown");
-
-  //   variables.push(
-  //     { name: "File", value: fileName, variablesReference: 0 },
-  //     { name: "Directory", value: dirName, variablesReference: 0 },
-  //     {
-  //       name: "f: myValidator",
-  //       value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,
-  //       variablesReference: 0,
-  //     },
-  //     {
-  //       name: "datum",
-  //       value: this.datumValue || "<not set>",
-  //       variablesReference: 0,
-  //       evaluateName: "cborHex",
-  //     }
-  //   );
-
-  //   const moduleName = filePath
-  //     ? await this.getModuleNameFromFile(filePath)
-  //     : null;
-  //   if (moduleName) {
-  //     variables.push({
-  //       name: "📄 Module",
-  //       value: moduleName,
-  //       variablesReference: 0,
-  //     });
-  //   }
-
-  //   if (filePath && currentLine !== undefined) {
-  //     const functions = await extractHaskellFunctions(filePath);
-
-  //     for (const func of functions) {
-  //       variables.push({
-  //         name: ` ${func.name} `,
-  //         value: `f: ${func.name} ${func.args.join(" ")} = ${func.body.join(
-  //           " "
-  //         )}`,
-  //         evaluateName: func.name,
-  //         variablesReference: 0,
-  //       });
-
-  //       for (const arg of func.args) {
-  //         const value = this._argumentMap?.[arg] || "not set";
-  //         variables.push({
-  //           name: ` ${arg} `,
-  //           value,
-  //           variablesReference: 0,
-  //         });
-  //       }
-  //     }
-  //   }
-
-  //   response.body = { variables };
-  //   this.sendResponse(response);
-  // }
-
-
   protected async variablesRequest(
     response: DebugProtocol.VariablesResponse,
     args: DebugProtocol.VariablesArguments
@@ -214,24 +94,17 @@ private _utxosVarRef = 1000; // some unique ID
     const currentLine = this._currentLine;
     const fileName = path.basename(filePath || "unknown");
     const dirName = path.dirname(filePath || "unknown");
-
-    
+  
+    // Safe stringify for BigInt
+    const safeStringify = (obj: any): string =>
+      JSON.stringify(obj, (_, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      );
   
     // Basic file info
     variables.push(
       { name: "File", value: fileName, variablesReference: 0 },
       { name: "Directory", value: dirName, variablesReference: 0 },
-      {
-        name: "f: myValidator",
-        value: `myValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()`,
-        variablesReference: 0,
-      },
-      {
-        name: "datum",
-        value: this.datumValue || "<not set>",
-        variablesReference: 0,
-        evaluateName: "cborHex",
-      }
     );
   
     // Module name if available
@@ -268,23 +141,11 @@ private _utxosVarRef = 1000; // some unique ID
         }
       }
     }
-  
-    
-    // Add Script UTXOs if available
-    if (this._scriptUtxos && this._scriptUtxos.length > 0) {
-      this._scriptUtxos.forEach((utxo: { txHash: any; outputIndex: any; assets: any; }, index: number) => {
-        variables.push({
-          name: `UTxO ${index + 1}`,
-          // Make the utxo object more readable as a string
-          value: `TxHash: ${utxo.txHash}, OutputIndex: ${utxo.outputIndex}, Value: ${JSON.stringify(utxo.assets)}`,
-          variablesReference: 0,
-        });
-      });
-    }
-  
+
     response.body = { variables };
     this.sendResponse(response);
   }
+  
   
   private async getModuleNameFromFile(
     filePath: string
@@ -297,7 +158,7 @@ private _utxosVarRef = 1000; // some unique ID
         const match = line.match(/^\s*module\s+([\w.]+)(\s*\(.*\))?\s+where/);
         if (match) {
           console.log("✅ Module Found:", match[1]);
-          return match[1]; // e.g., HelloWorld.Compiler
+          return match[1];
         }
       }
       console.warn("⚠️ No module declaration found in file:", filePath);
@@ -307,50 +168,6 @@ private _utxosVarRef = 1000; // some unique ID
       return null;
     }
   }
-
-  // protected async stackTraceRequest(
-  //   response: DebugProtocol.StackTraceResponse,
-  //   args: DebugProtocol.StackTraceArguments
-  // ): Promise<void> {
-  //   try {
-  //     const activeFile =
-  //       this.launchArgs?.activeFile ||
-  //       vscode.window.activeTextEditor?.document.fileName ||
-  //       "unknown";
-
-  //     const stackFrames: DebugProtocol.StackFrame[] = [];
-
-  //     if (this._currentLine !== undefined && this._currentLine > 0) {
-  //       const frame: DebugProtocol.StackFrame = {
-  //         id: 1,
-  //         name: "main", // or dynamically resolve function name if available
-  //         line: this._currentLine,
-  //         column: 1,
-  //         source: {
-  //           name: path.basename(activeFile),
-  //           path: activeFile,
-  //         },
-  //       };
-  //       stackFrames.push(frame);
-  //     }
-
-  //     response.body = {
-  //       stackFrames,
-  //       totalFrames: stackFrames.length,
-  //     };
-
-  //     this.sendResponse(response);
-  //   } catch (error) {
-  //     this.sendErrorResponse(response, {
-  //       id: 1,
-  //       format: `Failed to build stack trace: ${
-  //         error instanceof Error ? error.message : String(error)
-  //       }`,
-  //     });
-  //   }
-  // }
-
-  // new stack
 
   protected async stackTraceRequest(
     response: DebugProtocol.StackTraceResponse,
@@ -376,31 +193,6 @@ private _utxosVarRef = 1000; // some unique ID
           },
         };
         stackFrames.push(frame);
-      }
-  
-      // 🔹 Fetch UTXOs from script address
-      const scriptAddress = "addr_test1wzcya664ez773kpaq4ncfu9p2lra9gc5etctj7xhezhfp8g344adz"; // Replace with your actual script address
-      const blockfrostKey = "preprodyTn8tbXVaM3yr5LRyM5RDwhuopT06lAD"; // Replace with your actual API key
-  
-      try {
-        const { Lucid, Blockfrost } = await import("lucid-cardano");
-  
-        const lucid = await Lucid.new(
-          new Blockfrost("https://cardano-preprod.blockfrost.io/api/v0", blockfrostKey),
-          "Preprod"
-        );
-  console.log(lucid);
-  
-        const utxos = await lucid.utxosAt("addr_test1wp57kt4axfajllx9f0dm2w9a9d0vl75r0zwxg8gws0zfemcsf5t3v");
-        this._scriptUtxos = utxos; // 🔹 Store for later use (e.g., variablesRequest)
-        console.log("Fetched UTXOs from script address:", utxos);
-  
-        this.sendEvent(
-          new OutputEvent(`Fetched ${utxos.length} UTXOs from script address.\n`)
-        );
-      } catch (utxoError) {
-        console.error("Error fetching UTXOs:", utxoError);
-        this.sendEvent(new OutputEvent("Failed to fetch UTXOs.\n"));
       }
   
       response.body = {
@@ -579,89 +371,6 @@ private _utxosVarRef = 1000; // some unique ID
     this.sendResponse(response);
   }
 
-  // protected async stepInRequest(
-  //   response: DebugProtocol.StepInResponse,
-  //   args: DebugProtocol.StepInArguments,
-  //   request?: DebugProtocol.Request
-  // ): Promise<void> {
-  //   if (this._flag || this._currentLine === undefined) {
-  //     this.sendResponse(response);
-  //     return;
-  //   }
-
-  //   const editor = vscode.window.activeTextEditor;
-  //   if (!editor) {
-  //     this.sendResponse(response);
-  //     return;
-  //   }
-
-  //   const document = editor.document;
-  //   const fullLine = document.lineAt(this._currentLine - 1).text;
-
-  //   const rhs = fullLine.split("=")[1]?.trim();
-  //   if (!rhs) {
-  //     await this.nextRequest(response, args as DebugProtocol.NextArguments);
-  //     return;
-  //   }
-
-  //   const words = this.extractWords(rhs);
-  //   const functions = await extractHaskellFunctions(document.fileName);
-
-  //   for (const word of words) {
-  //     const targetFunc = functions.find((f) => f.name === word);
-  //     if (targetFunc) {
-  //       const targetLine = this.findFunctionDefinitionLine(document, word);
-  //       if (targetLine > 0) {
-          
-  //         this._callStack = this._callStack || []; 
-  //         this._callStack.push({
-  //           callerLine: this._currentLine,
-  //           callerFunc: this.extractFunctionName(fullLine),
-  //         });
-
-  //         this._currentLine = targetLine;
-
-  //         const callMatch = rhs.match(new RegExp(`${word}\\s+(.*)`));
-  //         const argValues = callMatch?.[1]?.split(/\s+/) || [];
-
-  //         this._argumentMap = {};
-  //         for (let i = 0; i < targetFunc.args.length; i++) {
-  //           const name = targetFunc.args[i];
-  //           const value = argValues[i] || "<missing>";
-  //           this._argumentMap[name] = value;
-  //         }
-
-  //         this.sendEvent(
-  //           new OutputEvent(`Stepped into ${word} at line ${targetLine}\n`)
-  //         );
-  //         this.sendEvent(
-  //           new OutputEvent(
-  //             `Captured args: ${JSON.stringify(this._argumentMap)}\n`
-  //           )
-  //         );
-  //         this.sendEvent(
-  //           new StoppedEvent("step", HaskellDebugSession.THREAD_ID)
-  //         );
-
-  //         editor.revealRange(
-  //           new vscode.Range(
-  //             new vscode.Position(targetLine - 1, 0),
-  //             new vscode.Position(targetLine - 1, Number.MAX_VALUE)
-  //           ),
-  //           vscode.TextEditorRevealType.InCenter
-  //         );
-
-  //         this.sendResponse(response);
-  //         return;
-  //       }
-  //     }
-  //   }
-
-  //   await this.nextRequest(response, args as DebugProtocol.NextArguments);
-  // }
-
-
-  // new step in
 
   protected async stepInRequest(
     response: DebugProtocol.StepInResponse,
@@ -723,17 +432,6 @@ private _utxosVarRef = 1000; // some unique ID
               `Captured args: ${JSON.stringify(this._argumentMap)}\n`
             )
           );
-  
-          // 🔧 UTXO fetch if stepping into specific function like `writeValidator`
-          if (word === "writeValidator") { // 🔧 change condition as needed
-            const scriptAddress = this.scriptAddress || "addr_test1..."; // 🔧 replace with your actual address
-            try {
-              const utxos = await this.loadScriptUtxos(scriptAddress); // 🔧 call the method
-              this.sendEvent(new OutputEvent(`📦 Fetched ${utxos.length} UTXOs from script address.\n`)); // 🔧 show result
-            } catch (err) {
-              this.sendEvent(new OutputEvent(`❌ Failed to fetch UTXOs: ${err}\n`)); // 🔧 error handling
-            }
-          }
   
           this.sendEvent(
             new StoppedEvent("step", HaskellDebugSession.THREAD_ID)
