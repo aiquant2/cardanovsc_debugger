@@ -1,4 +1,3 @@
-
 jest.mock('vscode', () => {
     const original = jest.requireActual('vscode');
     return {
@@ -38,10 +37,6 @@ jest.mock('vscode', () => {
     startGhcidOnHaskellOpen: jest.fn(),
   }));
   
-  jest.mock('../importData', () => ({
-    import_data: jest.fn(),
-  }));
-  
   import * as vscode from 'vscode';
   import {
     activate,
@@ -49,7 +44,6 @@ jest.mock('vscode', () => {
     HaskellConfigurationProvider,
     InlineDebugAdapterFactory,
   } from '../extension';
-  import { import_data } from '../importData';
   import { startGhcidOnHaskellOpen } from '../diagnostics';
   
   const mockContext: any = {
@@ -78,7 +72,6 @@ jest.mock('vscode', () => {
         expect.any(InlineDebugAdapterFactory)
       );
       expect(startGhcidOnHaskellOpen).toHaveBeenCalledWith(mockContext);
-      expect(import_data).toHaveBeenCalledWith(mockContext);
     });
   });
   

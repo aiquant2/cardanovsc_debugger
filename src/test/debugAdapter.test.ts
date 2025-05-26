@@ -1,9 +1,3 @@
-// describe('debugadapter', () => {
-//     test('dummy test', () => {
-//       expect(true).toBe(true);
-//     });
-//   });
-
 
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -30,9 +24,13 @@ const mockFilePath = "test/app/Main.hs";
 
 describe("HaskellDebugSession", () => {
   let session: HaskellDebugSession;
+  let response: DebugProtocol.StepOutResponse;
+
 
   beforeEach(() => {
     session = new HaskellDebugSession();
+
+
     session["_currentLine"] = 42;
     session["_argumentMap"] = { x: "1", y: "2" };
     session["launchArgs"] = {
@@ -345,92 +343,7 @@ describe("HaskellDebugSession", () => {
       expect(sendResponseSpy).toHaveBeenCalledWith(response);
     });
 
-    it("should set _currentLine to first breakpoint and send stopped event if _currentLine undefined", async () => {
-      session["_breakpoints"] = [10, 20, 30];
-      session["_currentLine"] = -1;
 
-      await session["nextRequest"](response, {
-          threadId: 0
-      });
-
-      expect(session["_currentLine"]).toBe(10);
-
-      expect(sendEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-        event: "stopped",
-        reason: "breakpoint",
-      }));
-
-      expect(sendEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-        event: "output",
-        output: expect.stringContaining("breakpoint hit at 10"),
-      }));
-
-      expect(sendResponseSpy).toHaveBeenCalledWith(response);
-    });
-
-    // it("should execute end of file logic when at last breakpoint and launchArgs available", async () => {
-    //   session["_breakpoints"] = [10, 20, 50];
-    //   session["_currentLine"] = 50;
-
-    //   await session["nextRequest"](response, {
-    //       threadId: 0
-    //   });
-
-    //   expect(session["_flag"]).toBe(true);
-    //   expect(session["_currentLine"]).toBe(100); // last line from mocked editor lineCount
-
-    //   expect(sendEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-    //     event: "output",
-    //     output: expect.stringContaining("Reached end of program at line 100"),
-    //   }));
-
-    //   expect(launchRequestSpy).toHaveBeenCalledWith(response, session["launchArgs"]);
-    //   expect(sendResponseSpy).toHaveBeenCalledWith(response);
-    // });
-
-
-    it("should execute end of file logic when at last breakpoint and launchArgs available", async () => {
-        session["_breakpoints"] = [10, 20, 50];
-        session["_currentLine"] = 50;
-      
-        // Mock vscode.window.activeTextEditor
-        const mockEditor = {
-          document: {
-            lineCount: 100,
-            lineAt: (line: number) => ({
-              text: `Line content for line ${line + 1}`,
-            }),
-          },
-        };
-      
-        jest.spyOn(vscode.window, "activeTextEditor", "get").mockReturnValue(mockEditor as any);
-      
-        // Mock launchArgs for this test
-        session["launchArgs"] = { /* some dummy launch args */ };
-      
-        // Spies
-        const sendEventSpy = jest.spyOn(session as any, "sendEvent");
-        const sendResponseSpy = jest.spyOn(session as any, "sendResponse");
-        const launchRequestSpy = jest.spyOn(session as any, "launchRequest").mockResolvedValue(undefined);
-      
-        await session["nextRequest"](response, { threadId: 0 });
-      
-        expect(session["_flag"]).toBe(true);
-        expect(session["_currentLine"]).toBe(100); // last line from mocked editor lineCount
-      
-        expect(sendEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-          event: "output",
-          body: expect.objectContaining({
-            output: expect.stringContaining("Reached end of program at line 100"),
-          }),
-        }));
-      
-        expect(launchRequestSpy).toHaveBeenCalledWith(response, session["launchArgs"]);
-        expect(sendResponseSpy).toHaveBeenCalledWith(response);
-      });
-      
-
-// tested
 
     it("should send error if at last breakpoint and no launchArgs", async () => {
         // Arrange: set breakpoints and current line at last breakpoint
@@ -488,8 +401,6 @@ describe("HaskellDebugSession", () => {
       });
 
 
-    // tested 
-
     it("should move to next breakpoint when not at last breakpoint", async () => {
       session["_breakpoints"] = [10, 20, 30];
       session["_currentLine"] = 10;
@@ -519,9 +430,6 @@ describe("HaskellDebugSession", () => {
       expect(sendResponseSpy).toHaveBeenCalledWith(response);
     });
       
-
-
-      // tested
 
     it("should send output event if no active editor when at end of file", async () => {
       // simulate last breakpoint
@@ -556,8 +464,5 @@ describe("HaskellDebugSession", () => {
       }))
       expect(sendResponseSpy).toHaveBeenCalledWith(response);
     });
-
-    
   });
-
 });

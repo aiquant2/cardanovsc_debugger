@@ -219,8 +219,6 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     this.sendResponse(response);
   }
 
-  /////////
-
   protected async nextRequest(
     response: DebugProtocol.NextResponse,
     args: DebugProtocol.NextArguments
@@ -311,9 +309,6 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
 
     this.sendResponse(response);
   }
-
-  ////
-
 
   protected async stepInRequest(
     response: DebugProtocol.StepInResponse,
