@@ -347,16 +347,19 @@ $ cabal init
   ]
 }
 ```
+
 #### Debug a single .hs file which is loaded in . cabal file containing a single contract
-- Ensure   one Folder or Workspace are opened in VSCode which is cabal project  and open your .hs file.
-- keep open  .hs file in which contract is written (it doesn`t support multiple file )
-- Do not add breakpoint on other file which is not open
- 
-#### Debug  a Single .hs File Containing a Smart Contract
 - Make sure that a single folder or workspace is opened in VSCode, and that it is a valid Cabal project.
 - Keep the .hs file that contains the smart contract open and in focus (debugging multiple files is not supported).
 - Do not set breakpoints in any file other than the one currently open.
 
+
+## debug demo
+![debug_demo](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_demo.png)
+- An error is shown in the debug console after clicking the VSCode debug button, and also inside the VSCode code editor if there is an error in the program.
+![debug_error](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_error.png)
+- The file data is displayed in the VSCode Variables section, and the argument values dynamically change after stepping into that function.
+![debug_variable](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_variable.png)
 ## 🤝 Contributing
 Contributions are welcome! Please open an issue or pull request on GitHub.
  
