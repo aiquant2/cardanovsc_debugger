@@ -24,12 +24,9 @@ const mockFilePath = "test/app/Main.hs";
 
 describe("HaskellDebugSession", () => {
   let session: HaskellDebugSession;
-  let response: DebugProtocol.StepOutResponse;
-
 
   beforeEach(() => {
     session = new HaskellDebugSession();
-
 
     session["_currentLine"] = 42;
     session["_argumentMap"] = { x: "1", y: "2" };
@@ -41,6 +38,7 @@ describe("HaskellDebugSession", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
 
   describe("getModuleNameFromFile", () => {
     it("should return module name when valid module line is found", async () => {
@@ -112,7 +110,7 @@ describe("HaskellDebugSession", () => {
     it("returns stack frame when _currentLine is set", async () => {
       session["_currentLine"] = 5;
       session["launchArgs"] = {
-        activeFile: "/mock/SomeFile.hs",
+        activeFile: "test/app/Main.hs",
       };
 
       const response: DebugProtocol.StackTraceResponse = {
@@ -140,8 +138,8 @@ describe("HaskellDebugSession", () => {
         line: 5,
         column: 1,
         source: {
-          name: path.basename("/mock/SomeFile.hs"),
-          path: "/mock/SomeFile.hs",
+          name: path.basename("test/app/Main.hs"),
+          path: "test/app/Main.hs",
         },
       });
 
@@ -151,7 +149,7 @@ describe("HaskellDebugSession", () => {
     it("returns no frame when _currentLine is undefined", async () => {
       session["_currentLine"] = -1;
       session["launchArgs"] = {
-        activeFile: "/mock/Empty.hs",
+        activeFile: "test/app/Main.hs",
       };
 
       const response: DebugProtocol.StackTraceResponse = {
@@ -279,12 +277,6 @@ describe("HaskellDebugSession", () => {
   });
 
 
-  ////
-
-
-//   // === New tests for nextRequest ===
-
-
   describe("nextRequest", () => {
     let response: DebugProtocol.NextResponse;
     let sendResponseSpy: jest.SpyInstance;
@@ -346,12 +338,10 @@ describe("HaskellDebugSession", () => {
 
 
     it("should send error if at last breakpoint and no launchArgs", async () => {
-        // Arrange: set breakpoints and current line at last breakpoint
         session["_breakpoints"] = [10, 20];
         session["_currentLine"] = 20;  // last breakpoint
         session["launchArgs"] = undefined;
       
-        // Mock vscode.window.activeTextEditor to simulate editor presence
         (vscode.window as any).activeTextEditor = {
           document: {
             lineCount: 42,
@@ -359,12 +349,10 @@ describe("HaskellDebugSession", () => {
           },
         };
       
-        // Spy on internal methods to check if they are called as expected
         const sendErrorResponseSpy = jest.spyOn(session as any, "sendErrorResponse");
         const sendResponseSpy = jest.spyOn(session as any, "sendResponse");
         const sendEventSpy = jest.spyOn(session as any, "sendEvent");
       
-        // Prepare a mock response object
         const response = {
           command: "next",
           request_seq: 1,
@@ -374,14 +362,10 @@ describe("HaskellDebugSession", () => {
           success: true,
         } as any;
       
-        // Act: call nextRequest
         await session["nextRequest"](response, { threadId: 0 });
       
-        // Assert:
-        // _flag should be set true indicating last breakpoint reached
         expect(session["_flag"]).toBe(true);
       
-        // sendErrorResponse should be called once with correct arguments
         expect(sendErrorResponseSpy).toHaveBeenCalledWith(response, {
           id: 1004,
           format: "Cannot restart: No previous launch configuration available",

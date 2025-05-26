@@ -1,6 +1,6 @@
 {
   "name": "cardanovsc-debugger",
-  "displayName": "cardanovsc_debugger",
+  "displayName": "CardanoVSC_Debugger",
   "description": "Plutus and Haskell  debugger extension",
   "version": "0.0.1",
   "engines": {
@@ -17,6 +17,7 @@
     "haskell",
     "plutus",
     "cardanovsc_debugger",
+    "CardanoVSC_Debugger",
     "ghci",
     "cabal",
     "debugger"
@@ -137,7 +138,8 @@
       },
       {
         "command": "cardanovscDebugger.getUtxoDetails",
-        "title": "Get UTXO Details"
+        "title": "Get latest UTXO Details",
+        "category": "cardanovsc_debugger"
       }
     ]
   },

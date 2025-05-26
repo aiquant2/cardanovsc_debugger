@@ -7,7 +7,6 @@ import {
   TerminatedEvent,
 } from "vscode-debugadapter";
 import { DebugProtocol } from "vscode-debugprotocol";
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as child_process from "child_process";
 import * as vscode from "vscode";
 import * as fs from "fs/promises";
@@ -64,7 +63,7 @@ private _callStack: { callerLine: number; callerFunc: string }[] = [];
     const scopes: DebugProtocol.Scope[] = [
       {
         name: "File Info",
-        variablesReference: 1000, // Arbitrary reference ID
+        variablesReference: 1000,
         expensive: false,
       },
     ];
@@ -136,7 +135,7 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
       const match = line.match(/^\s*module\s+([\w.]+)(\s*\(.*\))?\s+where/);
       if (match) {
         console.log("✅ Module Found:", match[1]);
-        return match[1]; // e.g., HelloWorld.Compiler
+        return match[1];
       }
     }
     console.warn("⚠️ No module declaration found in file:", filePath);
@@ -146,10 +145,6 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
     return null;
   }
 }
- 
-
-//////////
-
 
   protected async stackTraceRequest(
     response: DebugProtocol.StackTraceResponse,
@@ -166,7 +161,7 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
       if (this._currentLine !== undefined && this._currentLine > 0) {
         const frame: DebugProtocol.StackFrame = {
           id: 1,
-          name: "main", // or dynamically resolve function name if available
+          name: "main",
           line: this._currentLine,
           column: 1,
           source: {
@@ -395,10 +390,10 @@ private async getModuleNameFromFile(filePath: string): Promise<string | null> {
 
  
 private extractWords(rhs: string): string[] {
-  // Extract content inside [|| ... ||] if present
+  
   const match = rhs.match(/\[\|\|(.+?)\|\|\]/);
   if (match) {
-    rhs = match[1].trim(); // Replace rhs with the quoted content
+    rhs = match[1].trim(); 
   }
 
   const words: string[] = [];
@@ -512,8 +507,6 @@ private findFunctionDefinitionLine(
         return;
       }
 
-      // 🔁 Reset critical flags and clean previous state
-
       this.isFileLoaded = false;
       this.isRestarting = false;
 
@@ -545,7 +538,6 @@ private findFunctionDefinitionLine(
         );
       }
 
-      // eslint-disable-next-line eqeqeq
       if (this._currentLine == -1) {
         this._flag = true;
       }
@@ -777,7 +769,7 @@ private findFunctionDefinitionLine(
     this.launchRequest(response, args);
   }
     private extractFunctionName(line: string): string {
-    // Extract function name from line like "result = myFunc x y"
+      
     const match = line.match(/^\s*\w+\s*=\s*(\w+)/);
     return match?.[1] || "<unknown>";
   }
