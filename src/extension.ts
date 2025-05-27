@@ -179,27 +179,8 @@ export class HaskellConfigurationProvider
 }
 
 
-    config.program = config.program || "cabal repl --repl-no-load";
-    config.showIO = config.showIO !== false;
-    config.cwd =
-      config.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
-    return config;
-  }
 
-  private isHaskellFile(filePath: string): boolean {
-    return filePath.endsWith(".hs");
-  }
 
-  private async showFileTypeError(): Promise<void> {
-    await vscode.window.showErrorMessage(
-      "Active file must be a Haskell source file (.hs)"
-    );
-  }
 
-  private async showNoHaskellFileError(): Promise<void> {
-    await vscode.window.showErrorMessage(
-      "Please open a Haskell file or specify 'program' in your launch configuration"
-    );
-  }
-}
+
