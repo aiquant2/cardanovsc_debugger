@@ -412,3 +412,8 @@ start with config
 
 ![7](/home/kunal-kumar/Desktop/cardanovsc_debugger/docs/Untitled design (1).png)
 
+
+
+run
+
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/click_to_start.png)
