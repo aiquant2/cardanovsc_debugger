@@ -353,13 +353,18 @@ $ cabal init
 - Keep the .hs file that contains the smart contract open and in focus (debugging multiple files is not supported).
 - Do not set breakpoints in any file other than the one currently open.
 
+## Step to debug 
+
 
 ## debug demo
 ![debug_demo](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_demo.png)
-- An error is shown in the debug console after clicking the VSCode debug button, and also inside the VSCode code editor if there is an error in the program.
+- When the VSCode debug button is clicked, any errors in the program are displayed in both the Debug Console and directly within the code editor.
+
 ![debug_error](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_error.png)
-- The file data is displayed in the VSCode Variables section, and the argument values dynamically change after stepping into that function.
+- During debugging, the file data appears in the Variables section of VSCode. Argument values are updated dynamically as you step into functions.
+
 ![debug_variable](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/debug_variable.png)
+
 ## 🤝 Contributing
 Contributions are welcome! Please open an issue or pull request on GitHub.
  
