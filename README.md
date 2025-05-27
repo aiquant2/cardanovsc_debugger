@@ -366,7 +366,9 @@ $ cabal init
 #### Second method
 ![debug_button](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/vscode_debug_button.png)
 
-![create_config](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/create_launch.png)
+![click create config](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/create_config.png)
+
+![click ](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/click_to_start.png)
 
 
 
@@ -416,4 +418,5 @@ start with config
 
 run
 
-![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/click_to_start.png)
+
+
