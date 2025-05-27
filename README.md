@@ -1,4 +1,3 @@
-
   # ⚡ CardanoVSC Debugger 🚀  
  
  
@@ -13,6 +12,7 @@
 - and also register command to get latest utxo of script after locking transaction. that is `Get Latest UTXO Details`
  
  
+
 Perfect for developers working with Cardano’s Plutus smart contracts, CardanoVSC Debugger brings precision debugging right inside VS Code.
  
  
@@ -37,6 +37,7 @@ To start debugging Haskell or Plutus smart contracts with cardanovsc_debugger, f
 OR, you can also do like this :
  
 1. Go to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/vscode).
+
 2. Click **Install** or use the **Extensions** view in VS Code (`Ctrl+Shift+X`) and search for `CardanoVSC Debugger`.
 3. Upon installation, a notification will prompt you to install the cardanovsc extension as it is a required dependency for cardanovsc_debugger.
 4. Once installed, the extension will activate automatically when you open `.hs` files in vscode.
@@ -47,6 +48,7 @@ OR, you can also do like this :
  
 Upon installation, a notification will prompt you to install the cardanovsc extension as it is a required dependency for cardanovsc_debugger.
  
+
 ## 🏗️ Development
  
 ### ✅ Running Tests

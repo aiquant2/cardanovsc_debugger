@@ -9,9 +9,11 @@ import { config_disposal } from "./utils/webview";
 export async function activate(context: vscode.ExtensionContext) {
   config_disposal(context);
 
+
   const platform = os.platform();
   const scriptName =
     platform === "win32" ? "check-ghcid.bat" : "check-ghcid.sh";
+
 
   const scriptPath = path.join(context.extensionPath, "scripts", scriptName);
 
@@ -25,8 +27,10 @@ export async function activate(context: vscode.ExtensionContext) {
       console.log(`ghcid is installed: ${stdout.trim()}`);
     }
   });
+
  
   startGhcidOnHaskellOpen(context);
+
 
   context.subscriptions.push(
     vscode.commands.registerCommand("cardanovscDebugger.helloWorld", () => {
@@ -37,13 +41,13 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   try {
-    
+
     const configProvider = new HaskellConfigurationProvider();
     context.subscriptions.push(
       vscode.debug.registerDebugConfigurationProvider("haskell", configProvider)
     );
 
-  
+
     const debugAdapterFactory = new InlineDebugAdapterFactory();
     context.subscriptions.push(
       vscode.debug.registerDebugAdapterDescriptorFactory(
@@ -52,8 +56,6 @@ export async function activate(context: vscode.ExtensionContext) {
       )
     );
 
-    console.log(debugAdapterFactory);
-    console.log("Haskell debugger providers registered successfully");
   } catch (error) {
     console.error("Failed to register debug providers:", error);
     vscode.window.showErrorMessage("Failed to initialize Haskell debugger");
@@ -64,7 +66,10 @@ export function deactivate() {
   console.log("Haskell Debugger extension deactivated");
 }
 
+
 export class InlineDebugAdapterFactory
+
+
   implements vscode.DebugAdapterDescriptorFactory
 {
   createDebugAdapterDescriptor(
@@ -80,7 +85,9 @@ export class InlineDebugAdapterFactory
   }
 }
 
+
 export class HaskellConfigurationProvider
+
   implements vscode.DebugConfigurationProvider
 {
   resolveDebugConfiguration(
@@ -140,6 +147,7 @@ export class HaskellConfigurationProvider
       config.activeFile = editor.document.fileName;
     }
 
+
     if (!config.program && !config.activeFile) {
       this.showNoHaskellFileError();
       return undefined;
@@ -170,3 +178,28 @@ export class HaskellConfigurationProvider
   }
 }
 
+
+    config.program = config.program || "cabal repl --repl-no-load";
+    config.showIO = config.showIO !== false;
+    config.cwd =
+      config.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    return config;
+  }
+
+  private isHaskellFile(filePath: string): boolean {
+    return filePath.endsWith(".hs");
+  }
+
+  private async showFileTypeError(): Promise<void> {
+    await vscode.window.showErrorMessage(
+      "Active file must be a Haskell source file (.hs)"
+    );
+  }
+
+  private async showNoHaskellFileError(): Promise<void> {
+    await vscode.window.showErrorMessage(
+      "Please open a Haskell file or specify 'program' in your launch configuration"
+    );
+  }
+}

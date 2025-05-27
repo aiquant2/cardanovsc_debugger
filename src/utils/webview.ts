@@ -4,16 +4,19 @@ import * as vscode from "vscode";
 import { import_data, NetworkConfig } from "../importData";
 
 export function getLoadingHtml(address: string): string {
+
   return wrapHtml(`
     <div style="display: flex; align-items: center; gap: 12px;">
       <div class="spinner"></div>
       <p>🔍 Fetching UTXOs for <code>${address}</code>...</p>
     </div>
   `);
+
 }
 
 export function wrapHtml(innerHtml: string): string {
   return `
+
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -85,6 +88,8 @@ export function wrapHtml(innerHtml: string): string {
   `;
 }
 
+
+        
 
 export function buildUtxoHtml(utxo: any, datumHtml: string): string {
   const amounts = utxo.amount
