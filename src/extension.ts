@@ -8,9 +8,13 @@ import { config_disposal } from "./utils/webview";
 
 export async function activate(context: vscode.ExtensionContext) {
   config_disposal(context);
+
+
   const platform = os.platform();
   const scriptName =
     platform === "win32" ? "check-ghcid.bat" : "check-ghcid.sh";
+
+
   const scriptPath = path.join(context.extensionPath, "scripts", scriptName);
 
   execFile(scriptPath, (error, stdout, stderr) => {
@@ -23,10 +27,11 @@ export async function activate(context: vscode.ExtensionContext) {
       console.log(`ghcid is installed: ${stdout.trim()}`);
     }
   });
-  // Start Ghcid and Diagnostics when opening a Haskell file
+
+ 
   startGhcidOnHaskellOpen(context);
 
-  // Register Hello World Command
+
   context.subscriptions.push(
     vscode.commands.registerCommand("cardanovscDebugger.helloWorld", () => {
       vscode.window.showInformationMessage(
@@ -36,13 +41,13 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   try {
-    // Register configuration provider
+
     const configProvider = new HaskellConfigurationProvider();
     context.subscriptions.push(
       vscode.debug.registerDebugConfigurationProvider("haskell", configProvider)
     );
 
-    // Register debug adapter descriptor factory
+
     const debugAdapterFactory = new InlineDebugAdapterFactory();
     context.subscriptions.push(
       vscode.debug.registerDebugAdapterDescriptorFactory(
@@ -50,6 +55,7 @@ export async function activate(context: vscode.ExtensionContext) {
         debugAdapterFactory
       )
     );
+
   } catch (error) {
     console.error("Failed to register debug providers:", error);
     vscode.window.showErrorMessage("Failed to initialize Haskell debugger");
@@ -60,7 +66,10 @@ export function deactivate() {
   console.log("Haskell Debugger extension deactivated");
 }
 
-class InlineDebugAdapterFactory
+
+export class InlineDebugAdapterFactory
+
+
   implements vscode.DebugAdapterDescriptorFactory
 {
   createDebugAdapterDescriptor(
@@ -76,7 +85,9 @@ class InlineDebugAdapterFactory
   }
 }
 
-class HaskellConfigurationProvider
+
+export class HaskellConfigurationProvider
+
   implements vscode.DebugConfigurationProvider
 {
   resolveDebugConfiguration(
@@ -136,10 +147,37 @@ class HaskellConfigurationProvider
       config.activeFile = editor.document.fileName;
     }
 
+
     if (!config.program && !config.activeFile) {
       this.showNoHaskellFileError();
       return undefined;
     }
+
+    config.program = config.program || "cabal repl --repl-no-load";
+    config.showIO = config.showIO !== false;
+    config.cwd =
+      config.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    return config;
+  }
+
+  private isHaskellFile(filePath: string): boolean {
+    return filePath.endsWith(".hs");
+  }
+
+  private async showFileTypeError(): Promise<void> {
+    await vscode.window.showErrorMessage(
+      "Active file must be a Haskell source file (.hs)"
+    );
+  }
+
+  private async showNoHaskellFileError(): Promise<void> {
+    await vscode.window.showErrorMessage(
+      "Please open a Haskell file or specify 'program' in your launch configuration"
+    );
+  }
+}
+
 
     config.program = config.program || "cabal repl --repl-no-load";
     config.showIO = config.showIO !== false;

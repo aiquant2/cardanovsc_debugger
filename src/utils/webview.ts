@@ -1,70 +1,95 @@
+
 import axios from "axios";
 import * as vscode from "vscode";
 import { import_data, NetworkConfig } from "../importData";
 
 export function getLoadingHtml(address: string): string {
-  return wrapHtml(`<p>🔍 Fetching UTXOs for <code>${address}</code>...</p>`);
+
+  return wrapHtml(`
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="spinner"></div>
+      <p>🔍 Fetching UTXOs for <code>${address}</code>...</p>
+    </div>
+  `);
+
 }
 
 export function wrapHtml(innerHtml: string): string {
   return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 16px;
-            color: #333;
-            background: #f9f9f9;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 16px;
+          color: #333;
+          background: #f9f9f9;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+        }
+        code {
+          background: #eaeaea;
+          padding: 2px 4px;
+          border-radius: 4px;
+        }
+        code.highlight {
+          background-color: black;
+          color: white;
+          padding: 2px 4px;
+          border-radius: 4px;
+        }
+        pre {
+          background: #eee;
+          padding: 10px;
+          overflow-x: auto;
+          border-left: 4px solid #007acc;
+        }
+        h2, h3 {
+          color: #007acc;
+        }
+        main {
+          flex: 1;
+        }
+        footer {
+          text-align: center;
+          padding: 12px;
+          color: white;
+          background: linear-gradient(90deg, #0066cc, #3399ff);
+          font-size: 0.9em;
+          border-top: 1px solid #ccc;
+        }
+        .spinner {
+          width: 24px;
+          height: 24px;
+          border: 3px solid #ccc;
+          border-top: 3px solid #007acc;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
           }
-          code {
-            background: #eaeaea;
-            padding: 2px 4px;
-            border-radius: 4px;
-          }
-          code.highlight {
-            background-color: black;
-            color: white;
-            padding: 2px 4px;
-            border-radius: 4px;
-          }
-          pre {
-            background: #eee;
-            padding: 10px;
-            overflow-x: auto;
-            border-left: 4px solid #007acc;
-          }
-          h2, h3 {
-            color: #007acc;
-          }
-          main {
-            flex: 1;
-          }
-          footer {
-            text-align: center;
-            padding: 12px;
-            color: white;
-            background: linear-gradient(90deg, #0066cc, #3399ff);
-            font-size: 0.9em;
-            border-top: 1px solid #ccc;
-          }
-        </style>
-      </head>
-      <body>
-        <main>
-          ${innerHtml}
-        </main>
-        <footer>
-          CardanoVSC Debugger, AIQUANT TECHNOLOGIES
-        </footer>
-      </body>
-      </html>
-    `;
+        }
+      </style>
+    </head>
+    <body>
+      <main>
+        ${innerHtml}
+      </main>
+      <footer>
+        CardanoVSC Debugger, AIQUANT TECHNOLOGIES
+      </footer>
+    </body>
+    </html>
+  `;
 }
+
+
+        
 
 export function buildUtxoHtml(utxo: any, datumHtml: string): string {
   const amounts = utxo.amount

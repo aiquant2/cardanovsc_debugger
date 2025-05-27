@@ -1,6 +1,6 @@
 {
   "name": "cardanovsc-debugger",
-  "displayName": "cardanovsc_debugger",
+  "displayName": "CardanoVSC_Debugger",
   "description": "Plutus and Haskell  debugger extension",
   "version": "0.0.1",
   "engines": {
@@ -17,6 +17,7 @@
     "haskell",
     "plutus",
     "cardanovsc_debugger",
+    "CardanoVSC_Debugger",
     "ghci",
     "cabal",
     "debugger"
@@ -137,9 +138,9 @@
       },
       {
         "command": "cardanovscDebugger.getUtxoDetails",
-        "title": "Get UTXO Details"
+        "title": "Get latest UTXO Details",
+        "category": "cardanovsc_debugger"
       }
- 
     ]
   },
   "scripts": {
@@ -148,20 +149,24 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "jest"
   },
   "devDependencies": {
     "@types/chai": "^5.2.1",
+    "@types/jest": "^29.5.14",
     "@types/lodash": "^4.17.16",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
-    "@vscode/debugadapter-testsupport": "^1.56.0",
+    "@vscode/debugadapter-testsupport": "^1.51.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.16.0"
+    "eslint": "^9.16.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.3.4",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
@@ -171,7 +176,6 @@
     "chai": "^5.2.0",
     "lodash": "^4.17.21",
     "rxjs": "^7.8.2",
-    "typescript": "^5.8.3",
     "vscode-debugadapter": "^1.51.0",
     "vscode-debugadapter-testsupport": "^1.51.0"
   }
