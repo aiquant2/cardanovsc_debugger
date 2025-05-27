@@ -158,16 +158,13 @@ describe('diagnostics.ts', () => {
       vscode.DiagnosticSeverity.Error
     );
 
-    // Setup diagnostics mock
     mockDiagnosticCollection.get = jest.fn(() => [fakeDiagnostic]);
 
-    // Force updateErrorDecorations to use our mock diagnostic collection
     (diagnosticCollection as any) = mockDiagnosticCollection;
 
-    // Call function under test
+    
     updateErrorDecorations();
 
-    // Assert setDecorations was called
     const editor = vscode.window.activeTextEditor!;
     expect(editor.setDecorations).toHaveBeenCalledWith(expect.anything(), [fakeRange]);
   });
