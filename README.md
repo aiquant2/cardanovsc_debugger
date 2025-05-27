@@ -368,6 +368,13 @@ $ cabal init
 
 ![click create config](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/create_config.png)
 
+
+![select config](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/select_config.png)
+
+
+![Select Debug Configuration]()
+
+
 ![click ](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/click_to_start.png)
 
 
@@ -417,6 +424,5 @@ start with config
 
 
 run
-
 
 
