@@ -353,7 +353,21 @@ $ cabal init
 - Keep the .hs file that contains the smart contract open and in focus (debugging multiple files is not supported).
 - Do not set breakpoints in any file other than the one currently open.
 
-## Step to debug 
+## 🧠 Debug Process
+###### There are two ways :-
+#### first method
+
+![debug_button](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/vscode_debug_button.png)
+
+![run_button](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/click_run_and_debug_button.png)
+
+![click_run and debug](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/start_just_click_runButton.gif)
+
+#### Second method
+![debug_button](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/vscode_debug_button.png)
+
+![create_config](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/create_launch.png)
+
 
 
 ## debug demo
@@ -376,4 +390,25 @@ This project is licensed under the MIT License.
 - **Scope and Design Document:** https://github.com/AIQUANT-Tech/CardanoVSC/blob/main/DesignDocs/CardanoVSC-Scope_Design_Document.pdf
 - **Figma Design:** https://www.figma.com/design/MiVmXAtePUc3UndaGl7eGK
  
- 
+1
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/vscode_debug_button.png)
+
+2
+start with config  
+
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/start_with_config.gif)
+
+3. start just click run button 
+
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/start_just_click_runButton.gif)
+
+4. start debug
+
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/start_debug.png)
+
+5. start config
+
+![1](https://raw.githubusercontent.com/aiquant2/cardanovsc_debugger/refs/heads/feature/docs/select_config.png)
+
+![7](/home/kunal-kumar/Desktop/cardanovsc_debugger/docs/Untitled design (1).png)
+
